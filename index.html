@@ -307,7 +307,7 @@
           case 'documentos': return <DocumentsPage documents={documents} docTypes={docTypes} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} storage={storage} />;
           case 'despesas': return <ExpensesPage expenses={expenses} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} />;
           case 'orcamentos': return <BudgetsPage budgets={budgets} isAdmin={isAdmin} db={db} appId={appId} />;
-          case 'conta-corrente': return isAdmin ? <CurrentAccountPage budgets={budgets} users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} /> : null;
+          case 'conta-corrente': return isAdmin ? <CurrentAccountPage budgets={budgets} users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} condo={condo} t={t} /> : null;
           case 'fracoes': return <FractionsPage users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} budgets={budgets} currentUser={currentUser} t={t} />;
           case 'definicoes': return <SettingsPage currentUser={currentUser} db={db} appId={appId} t={t} />;
           default: return <AdminDashboard />;
@@ -1702,7 +1702,7 @@
       );
     }
 
-    function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId }) {
+    function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo, t }) {
       const sortedBudgets = [...budgets].sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
       const currentBudget = sortedBudgets[0];
 
@@ -1745,6 +1745,39 @@
               status: 'paid',
               updatedAt: new Date().toISOString()
             });
+
+            // Enviar e-mail de recibo
+            const user = users.find(u => u.firestoreId === userId);
+            if (user && user.email) {
+              const perm = parseFloat(user.permilagem) || 0;
+              const quotaBase = (monthlyTotal * (perm / 1000));
+              const reserveFund = quotaBase * (rfPerc / 100);
+              const total = quotaBase + reserveFund;
+              const dateObj = new Date();
+              const [year, monthIdx] = monthKey.split('-').map(Number);
+              const monthName = t(`months.${monthIdx}`);
+              const today = dateObj.toLocaleDateString('pt-PT');
+              const condoName = condo?.name || 'Condomínio';
+
+              await addDoc(collection(db, 'artifacts', appId, 'public', 'mail'), {
+                to: user.email,
+                message: {
+                  subject: `Recibo de Pagamento - Quota ${monthName} ${year} - ${user.fraction}`,
+                  html: `
+                    <p>O Condomínio ${condoName} comprova que a quota referente ao mês ${monthName} foi paga no dia ${today} para a fração ${user.fraction}.</p>
+                    <p>O presente email serve como recibo de pagamento.</p>
+                    <hr>
+                    <p><strong>Detalhes do Pagamento:</strong></p>
+                    <ul>
+                      <li><strong>Fração:</strong> ${user.fraction}</li>
+                      <li><strong>Mês de Referência:</strong> ${monthName} ${year}</li>
+                      <li><strong>Valor Pago:</strong> ${total.toFixed(2)} €</li>
+                      <li><strong>Data de Pagamento:</strong> ${today}</li>
+                    </ul>
+                  `
+                }
+              });
+            }
           }
         } catch (err) {
           alert('Erro ao atualizar estado de pagamento: ' + err.message);
