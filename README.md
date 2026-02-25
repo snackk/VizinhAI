@@ -111,7 +111,7 @@ Follow these exact steps:
 - Add the following fields to the document:
 - - id (string): Paste the User UID again
 - - email (string): admin@vizinhai.com
-- -name (string): Administrator
-- -fraction (string): Backoffice
+- - name (string): Administrator
+- - fraction (string): Backoffice
 - - role (string): admin
 - - Click Save.
