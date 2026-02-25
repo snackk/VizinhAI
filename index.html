@@ -402,7 +402,14 @@
           }
         }, (err) => console.error("Erro condo:", err));
 
-        return () => { unsubUsers(); unsubQuotas(); unsubExpenses(); unsubBudgets(); unsubDocs(); unsubDocTypes(); unsubCondo(); };
+        const unsubUserInCondo = onSnapshot(doc(db, 'condos', selectedCondoId, 'users', firebaseUser.uid), (docSnap) => {
+          if (docSnap.exists()) {
+            const condoUserData = docSnap.data();
+            setCurrentUser(prev => ({ ...prev, ...condoUserData }));
+          }
+        }, (err) => console.error("Erro userInCondo:", err));
+
+        return () => { unsubUsers(); unsubQuotas(); unsubExpenses(); unsubBudgets(); unsubDocs(); unsubDocTypes(); unsubCondo(); unsubUserInCondo(); };
       }, [firebaseUser, selectedCondoId]);
 
       const handleLogout = () => signOut(auth);
