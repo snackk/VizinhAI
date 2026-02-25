@@ -1768,67 +1768,113 @@
               const today = dateObj.toLocaleDateString('pt-PT');
               const condoName = condo?.name || 'Condomínio';
 
-              // Gerar PDF do Recibo
+              // Gerar PDF do Recibo semelhante à imagem
               let pdfBase64 = null;
               try {
                 const { jsPDF } = window.jspdf;
                 const docPdf = new jsPDF();
-                
-                // Cabeçalho - Dados do Condomínio (Esquerda)
-                docPdf.setFontSize(10);
-                docPdf.setTextColor(100);
-                docPdf.text(condoName, 20, 20);
-                docPdf.text(`NIF: ${condo?.nif || 'N/A'}`, 20, 25);
-                docPdf.text(condo?.address || 'N/A', 20, 30);
-                
-                // Cabeçalho - Dados do Condómino (Direita)
-                docPdf.textAlign = 'right';
-                docPdf.text(user.name, 190, 20);
-                docPdf.text(`Fração: ${user.fraction}`, 190, 25);
-                docPdf.textAlign = 'left';
 
-                // Título
-                docPdf.setFontSize(18);
-                docPdf.setTextColor(0);
-                docPdf.text('RECIBO DE PAGAMENTO', 105, 50, { align: 'center' });
-                
-                // Corpo do PDF
-                docPdf.setFontSize(12);
-                docPdf.text(`Data de Emissão: ${today}`, 20, 70);
-                
-                docPdf.setDrawColor(200);
-                docPdf.line(20, 75, 190, 75);
-                
-                docPdf.text('Descrição', 20, 85);
-                docPdf.text('Valor', 160, 85);
-                
-                docPdf.line(20, 88, 190, 88);
-                
-                docPdf.setFontSize(11);
-                docPdf.text(`Quota do orçamento - ${monthName} ${year}`, 20, 98);
-                docPdf.text(`${quotaBase.toFixed(2)} €`, 160, 98);
-                
-                docPdf.text(`Quota do fundo comum de reserva (${rfPerc}%)`, 20, 106);
-                docPdf.text(`${reserveFund.toFixed(2)} €`, 160, 106);
-                
-                docPdf.line(20, 112, 190, 112);
-                
-                docPdf.setFont(undefined, 'bold');
-                docPdf.text('TOTAL PAGO', 20, 122);
-                docPdf.text(`${total.toFixed(2)} €`, 160, 122);
-                
-                docPdf.setFont(undefined, 'normal');
+                // Fontes padrão (Helvetica é semelhante à fonte do screenshot)
+                docPdf.setFont("helvetica");
+
+                // --- CABEÇALHO ESQUERDO (Dados do Condomínio) ---
                 docPdf.setFontSize(10);
-                docPdf.text(`Fração: ${user.fraction}`, 20, 140);
-                docPdf.text(`Este documento comprova o pagamento da quota referente ao mês de ${monthName} de ${year}.`, 20, 148);
-                
-                // Rodapé
+                docPdf.setFont("helvetica", "bold");
+                // Divide o nome do condomínio se for longo ou usa como está
+                docPdf.text(condoName, 15, 20);
+
+                docPdf.setFont("helvetica", "normal");
+                // Assumindo que a morada e código postal vêm da variável condo.address
+                // (Idealmente, separavas a morada do código postal, aqui agrupamos numa linha ou usas o que tens)
+                const addressLines = docPdf.splitTextToSize(condo?.address || 'N/A', 80);
+                docPdf.text(addressLines, 15, 25);
+
+                const nifY = 25 + (addressLines.length * 5);
+                docPdf.text(`NIF: ${condo?.nif || 'N/A'}`, 15, nifY);
+
+                // --- CABEÇALHO DIREITO (Dados do Condómino) ---
+                const rightX = 120;
+                docPdf.text("Exmo(a) Sr.(a):", rightX, 35);
+                docPdf.text(user.name, rightX, 40);
+                docPdf.text(`Fração: ${user.fraction}`, rightX, 45);
+
+                // --- DADOS DO RECIBO ---
+                const midY = 70;
+                docPdf.setFont("helvetica", "bold");
+                // O utilizador pode não ter NIF guardado no sistema atual, se não tiver mete 'Consumidor Final' ou adapta no futuro
+                docPdf.text(`V/ NIF: ${user.nif || '999999990'}`, 15, midY);
+
+                docPdf.text("Data de pagamento: ", 15, midY + 8);
+                docPdf.setFont("helvetica", "normal");
+                docPdf.text(today.replace(/\//g, '-'), 50, midY + 8);
+
+                docPdf.text("Recebemos de V. Ex.ª o pagamento dos seguintes valores:", 15, midY + 16);
+
+                // --- TABELA ---
+                const tableY = midY + 30;
+
+                docPdf.setFontSize(9);
+                docPdf.setFont("helvetica", "bold");
+                docPdf.text("Documento", 15, tableY);
+                docPdf.text("Data", 40, tableY);
+                docPdf.text("Vencimento", 65, tableY);
+                docPdf.text("Fração", 90, tableY);
+                docPdf.text("Descrição", 110, tableY);
+                docPdf.text("Recebido (€)", 195, tableY, { align: "right" });
+
+                // Linha de cabeçalho da tabela
+                docPdf.setLineWidth(0.2);
+                docPdf.line(15, tableY + 2, 195, tableY + 2);
+
+                // --- LINHAS DA TABELA (Valores) ---
+                docPdf.setFont("helvetica", "normal");
+                let rowY = tableY + 8;
+
+                // Datas formatadas para as colunas (exemplo: Dia 1 para data, Dia 8 para vencimento)
+                const docDate = `01-${String(monthIdx + 1).padStart(2, '0')}-${year}`;
+                const dueDate = `08-${String(monthIdx + 1).padStart(2, '0')}-${year}`;
+                const monthNameStr = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+
+                // Linha 1: Quota do Orçamento
+                docPdf.text(`Q ${Math.floor(Math.random() * 1000)}`, 15, rowY); // Número de documento gerado ou sequencial
+                docPdf.text(docDate, 40, rowY);
+                docPdf.text(dueDate, 65, rowY);
+                docPdf.text(user.fraction, 90, rowY);
+                docPdf.text(`Quota do orçamento - ${monthNameStr} / ${year}`, 110, rowY);
+                docPdf.text(quotaBase.toFixed(2).replace('.', ','), 195, rowY, { align: "right" });
+
+                // Linha 2: Quota do Fundo Comum de Reserva
+                rowY += 6;
+                docPdf.text(`Q ${Math.floor(Math.random() * 1000)}`, 15, rowY);
+                docPdf.text(docDate, 40, rowY);
+                docPdf.text(dueDate, 65, rowY);
+                docPdf.text(user.fraction, 90, rowY);
+                docPdf.text(`Quota do fundo comum de reserva - ${monthNameStr} / ${year}`, 110, rowY);
+                docPdf.text(reserveFund.toFixed(2).replace('.', ','), 195, rowY, { align: "right" });
+
+                // Linha de fecho da tabela
+                rowY += 6;
+                docPdf.line(15, rowY, 195, rowY);
+
+                // --- RODAPÉ E TOTAIS ---
+                rowY += 6;
                 docPdf.setFontSize(8);
-                docPdf.setTextColor(150);
-                docPdf.text('Gerado automaticamente por VizinhAI', 105, 280, { align: 'center' });
-                
+                docPdf.text("Isento de I.V.A. nos termos do artº 9º do nº21 do CIVA", 15, rowY);
+
+                docPdf.setFontSize(9);
+                docPdf.setFont("helvetica", "bold");
+                docPdf.text("Total:", 160, rowY);
+                docPdf.text(total.toFixed(2).replace('.', ','), 195, rowY, { align: "right" });
+
+                rowY += 6;
+                docPdf.setFont("helvetica", "bold");
+                docPdf.text("Pagamento:", 15, rowY);
+                docPdf.setFont("helvetica", "normal");
+                docPdf.text("Transferência", 35, rowY); // ou dinâmico se tiveres métodos de pagamento
+
                 const pdfOutput = docPdf.output('datauristring');
                 pdfBase64 = pdfOutput.split(',')[1];
+
               } catch (pdfErr) {
                 console.error("Erro ao gerar PDF:", pdfErr);
               }
