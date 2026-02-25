@@ -52,10 +52,10 @@
       Download, Settings, Save, Lock, User
     } from 'https://esm.sh/lucide-react@0.292.0';
 
-    import { initializeApp } from 'https://esm.sh/firebase@10.8.0/app';
-    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged } from 'https://esm.sh/firebase@10.8.0/auth';
-    import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, updateDoc } from 'https://esm.sh/firebase@10.8.0/firestore';
-    import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://esm.sh/firebase@10.8.0/storage';
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+    import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+    import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js';
 
     let firebaseConfig = {};
     try {
