@@ -2480,7 +2480,7 @@
 
                 // Recibo no canto superior direito
                 docPdf.setFontSize(12);
-                docPdf.text(`RECIBO Nº ${receiptNumber}`, 195, 20, { align: "right" });
+                docPdf.text(`RECIBO ${receiptNumber}`, 195, 20, { align: "right" });
 
                 docPdf.setFontSize(10);
                 docPdf.setFont("helvetica", "normal");
@@ -2497,7 +2497,7 @@
                 docPdf.text("Exmo(a) Sr.(a):", rightX, nifY + 10, { align: "right" });
                 docPdf.setFont("helvetica", "normal");
                 docPdf.text(user.name, rightX, nifY + 15, { align: "right" });
-                docPdf.text(`Fração: ${user.fraction}`, rightX, nifY + 20, { align: "right" });
+                docPdf.text(`${user.fraction}`, rightX, nifY + 20, { align: "right" });
 
                 // --- DADOS DO RECIBO ---
                 const midY = nifY + 40;
