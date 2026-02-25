@@ -56,7 +56,7 @@
 
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
     import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
-    import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, updateDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+    import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, updateDoc, deleteDoc, query, where } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
     import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js';
 
     let firebaseConfig = {};
@@ -485,7 +485,7 @@
           case 'conta-corrente': return isAdmin ? <CurrentAccountPage budgets={budgets} users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} condo={condo} t={t} selectedCondoId={effectiveCondoId} /> : null;
           case 'fracoes': return <FractionsPage users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} budgets={budgets} currentUser={currentUser} t={t} selectedCondoId={effectiveCondoId} />;
           case 'definicoes': return <SettingsPage currentUser={currentUser} db={db} appId={appId} t={t} selectedCondoId={selectedCondoId} />;
-          case 'mails': return (isAdmin || isBackoffice) ? <MailsPage db={db} t={t} /> : null;
+          case 'mails': return (isAdmin || isBackoffice) ? <MailsPage db={db} t={t} selectedCondoId={effectiveCondoId} isBackoffice={isBackoffice} /> : null;
           case 'condos': return isBackoffice ? <CondosPage allCondos={allCondos} db={db} t={t} onFirstCreate={() => setSelectedCondoId(null)} /> : null;
           default: return <AdminDashboard />;
         }
@@ -890,14 +890,19 @@
       );
     }
 
-    function MailsPage({ db, t }) {
+    function MailsPage({ db, t, selectedCondoId, isBackoffice }) {
       const [mails, setMails] = useState([]);
       const [search, setSearch] = useState('');
       const [filterError, setFilterError] = useState(false);
       const [loading, setLoading] = useState(true);
 
       useEffect(() => {
-        const unsub = onSnapshot(collection(db, 'mail'), (snap) => {
+        let q = collection(db, 'mail');
+        if (!isBackoffice && selectedCondoId) {
+          q = query(q, where('condoId', '==', selectedCondoId));
+        }
+
+        const unsub = onSnapshot(q, (snap) => {
           setMails(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() })).sort((a, b) => {
             const dateA = a.delivery?.endTime?.toDate?.() || new Date(0);
             const dateB = b.delivery?.endTime?.toDate?.() || new Date(0);

@@ -76,7 +76,8 @@ service cloud.firestore {
     // Trigger Email Extension Collection
     match /mail/{mailId} {
       allow create: if isAuth();
-      allow read, update, delete: if false;
+      allow read: if isBackoffice() || (isAuth() && isAdmin(resource.data.condoId));
+      allow update, delete: if false;
     }
   }
 }
