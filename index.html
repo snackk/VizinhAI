@@ -444,7 +444,7 @@
           case 'orcamentos': return <BudgetsPage budgets={budgets} isAdmin={isAdmin} db={db} appId={appId} selectedCondoId={effectiveCondoId} />;
           case 'conta-corrente': return isAdmin ? <CurrentAccountPage budgets={budgets} users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} condo={condo} t={t} selectedCondoId={effectiveCondoId} /> : null;
           case 'fracoes': return <FractionsPage users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} budgets={budgets} currentUser={currentUser} t={t} selectedCondoId={effectiveCondoId} />;
-          case 'definicoes': return <SettingsPage currentUser={currentUser} db={db} appId={appId} t={t} />;
+          case 'definicoes': return <SettingsPage currentUser={currentUser} db={db} appId={appId} t={t} selectedCondoId={selectedCondoId} />;
           case 'condos': return isBackoffice ? <CondosPage allCondos={allCondos} db={db} t={t} onFirstCreate={() => setSelectedCondoId(null)} /> : null;
           default: return <AdminDashboard />;
         }
@@ -1998,6 +1998,14 @@
               phone: newPhone,
               nif: parseInt(newNif) || null,
             });
+            
+            // Atualizar também no perfil global
+            await updateDoc(doc(db, 'users', editingUser.firestoreId), {
+              name: newName,
+              permilagem: parseFloat(newPermilagem) || 0,
+              phone: newPhone,
+              nif: parseInt(newNif) || null,
+            });
             setMsg({ type: 'success', text: 'Condómino atualizado!' });
             setTimeout(() => { setShowForm(false); setEditingUser(null); }, 2000);
           } else {
@@ -2027,6 +2035,9 @@
               name: newName,
               email: newEmail,
               role: 'user',
+              permilagem: parseFloat(newPermilagem) || 0,
+              phone: newPhone,
+              nif: parseInt(newNif) || null,
               condoIds: [selectedCondoId]
             }, { merge: true });
 
@@ -2453,7 +2464,7 @@
       );
     }
 
-    function SettingsPage({ currentUser, db, appId, t }) {
+    function SettingsPage({ currentUser, db, appId, t, selectedCondoId }) {
       const [name, setName] = useState(currentUser.name);
       const [phone, setPhone] = useState(currentUser.phone || '');
       const [nif, setNif] = useState(currentUser.nif || '');
@@ -2465,12 +2476,23 @@
         e.preventDefault();
         setSaving(true); setMessage({ type: '', text: '' });
         try {
-          await updateDoc(doc(db, 'users', currentUser.firestoreId), { 
+          const userUpdate = { 
             name,
             phone,
             nif: parseInt(nif) || null,
             language 
-          });
+          };
+          await updateDoc(doc(db, 'users', currentUser.firestoreId), userUpdate);
+          
+          // Se o utilizador estiver num condomínio, atualizar também lá
+          if (selectedCondoId) {
+            try {
+              await updateDoc(doc(db, 'condos', selectedCondoId, 'users', currentUser.firestoreId), userUpdate);
+            } catch (err) {
+              console.warn("Não foi possível atualizar perfil no contexto do condomínio:", err);
+            }
+          }
+          
           setMessage({ type: 'success', text: t('profileSaved') });
         } catch (err) {
           setMessage({ type: 'error', text: t('errorSaving') });
