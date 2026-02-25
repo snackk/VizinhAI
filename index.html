@@ -2473,39 +2473,33 @@
                 // Fontes padrão (Helvetica é semelhante à fonte do screenshot)
                 docPdf.setFont("helvetica");
 
-                // --- CABEÇALHO ESQUERDO (Dados do Condomínio) ---
+                // --- CABEÇALHO (Dados do Condomínio e Recibo) ---
                 docPdf.setFontSize(10);
                 docPdf.setFont("helvetica", "bold");
-                // Divide o nome do condomínio se for longo ou usa como está
                 docPdf.text(condoName, 15, 20);
 
+                // Recibo no canto superior direito
+                docPdf.setFontSize(12);
+                docPdf.text(`RECIBO Nº ${receiptNumber}`, 195, 20, { align: "right" });
+
+                docPdf.setFontSize(10);
                 docPdf.setFont("helvetica", "normal");
-                // Assumindo que a morada e código postal vêm da variável condo.address
-                // (Idealmente, separavas a morada do código postal, aqui agrupamos numa linha ou usas o que tens)
                 const addressLines = docPdf.splitTextToSize(condo?.address || 'N/A', 80);
                 docPdf.text(addressLines, 15, 25);
 
                 const nifY = 25 + (addressLines.length * 5);
                 docPdf.text(`NIF: ${condo?.nif || 'N/A'}`, 15, nifY);
 
-                // --- NÚMERO DO RECIBO ---
-                docPdf.setFontSize(12);
-                docPdf.setFont("helvetica", "bold");
-                docPdf.text(`RECIBO Nº ${receiptNumber}`, 15, 55);
-                docPdf.setFontSize(10);
-
                 // --- CABEÇALHO DIREITO (Dados do Condómino) ---
+                // Alinhado horizontalmente com o fim do bloco do condomínio (nifY)
                 const rightX = 195;
-                docPdf.setFontSize(10);
-                docPdf.setFont("helvetica", "normal");
-                docPdf.text("Exmo(a) Sr.(a):", rightX, 20, { align: "right" });
-                docPdf.text(user.name, rightX, 25, { align: "right" });
-                docPdf.text(`Fração: ${user.fraction}`, rightX, 30, { align: "right" });
+                docPdf.text("Exmo(a) Sr.(a):", rightX, nifY - 10, { align: "right" });
+                docPdf.text(user.name, rightX, nifY - 5, { align: "right" });
+                docPdf.text(`Fração: ${user.fraction}`, rightX, nifY, { align: "right" });
 
                 // --- DADOS DO RECIBO ---
-                const midY = 70;
+                const midY = nifY + 20;
                 docPdf.setFont("helvetica", "bold");
-                // O utilizador pode não ter NIF guardado no sistema atual, se não tiver mete 'Consumidor Final' ou adapta no futuro
                 docPdf.text(`V/ NIF: ${user.nif || '999999990'}`, 15, midY);
 
                 docPdf.text("Data de pagamento: ", 15, midY + 8);
