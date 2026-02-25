@@ -146,12 +146,13 @@
 
       const renderContent = () => {
         switch (activeTab) {
-          case 'dashboard': return isAdmin ? <AdminDashboard expenses={expenses} quotas={quotas} users={users} budgets={budgets} /> : <UserDashboard user={currentUser} quotas={quotas} expenses={expenses} />;
+          case 'dashboard': return isAdmin ? <AdminDashboard expenses={expenses} quotas={quotas} users={users} budgets={budgets} /> : <UserDashboard user={currentUser} quotas={quotas} expenses={expenses} budgets={budgets} />;
           case 'condo': return <CondoPage condo={condo} isAdmin={isAdmin} db={db} appId={appId} />;
           case 'documentos': return <DocumentsPage documents={documents} docTypes={docTypes} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} storage={storage} />;
           case 'despesas': return <ExpensesPage expenses={expenses} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} />;
           case 'orcamentos': return <BudgetsPage budgets={budgets} isAdmin={isAdmin} db={db} appId={appId} />;
-          case 'fracoes': return <FractionsPage users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} />;
+          case 'conta-corrente': return isAdmin ? <CurrentAccountPage budgets={budgets} users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} /> : null;
+          case 'fracoes': return <FractionsPage users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} budgets={budgets} />;
           case 'definicoes': return <SettingsPage currentUser={currentUser} db={db} appId={appId} />;
           default: return <AdminDashboard />;
         }
@@ -176,6 +177,7 @@
               <NavItem icon={<FolderOpen />} label="Documentos" active={activeTab === 'documentos'} onClick={() => { setActiveTab('documentos'); setIsMobileMenuOpen(false); }} />
               <NavItem icon={<Receipt />} label="Despesas" active={activeTab === 'despesas'} onClick={() => { setActiveTab('despesas'); setIsMobileMenuOpen(false); }} />
               <NavItem icon={<Wallet />} label="Orçamentos" active={activeTab === 'orcamentos'} onClick={() => { setActiveTab('orcamentos'); setIsMobileMenuOpen(false); }} />
+              {isAdmin && <NavItem icon={<TrendingUp />} label="Conta Corrente" active={activeTab === 'conta-corrente'} onClick={() => { setActiveTab('conta-corrente'); setIsMobileMenuOpen(false); }} />}
               <NavItem icon={<Users />} label="Frações" active={activeTab === 'fracoes'} onClick={() => { setActiveTab('fracoes'); setIsMobileMenuOpen(false); }} />
             </nav>
             
@@ -278,10 +280,41 @@
       );
     }
 
-    function UserDashboard({ user, quotas, expenses }) {
-      const myQuotas = quotas.filter(q => q.userId === user.id);
-      const pendingAmount = myQuotas.filter(q => q.status === 'pending').reduce((acc, curr) => acc + curr.amount, 0);
-      const hasDebt = pendingAmount > 0;
+    function UserDashboard({ user, quotas, expenses, budgets }) {
+      const sortedBudgets = [...budgets].sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+      const currentBudget = sortedBudgets[0];
+
+      const getMonths = (start, end) => {
+        const months = [];
+        if (!start || !end) return months;
+        let current = new Date(start);
+        const last = new Date(end);
+        while (current <= last) {
+          months.push(new Date(current));
+          current.setMonth(current.getMonth() + 1);
+        }
+        return months;
+      };
+
+      const months = currentBudget ? getMonths(currentBudget.startDate, currentBudget.endDate) : [];
+      const rfPerc = currentBudget?.reserveFundPercentage ?? 10;
+      const monthlyTotal = currentBudget ? currentBudget.totalAmount / 12 : 0;
+      const perm = parseFloat(user.permilagem) || 0;
+      const quotaBase = (monthlyTotal * (perm / 1000));
+      const reserveFund = quotaBase * (rfPerc / 100);
+      const totalMonthly = quotaBase + reserveFund;
+
+      // Calcular meses em dívida até ao mês atual
+      const now = new Date();
+      const debtMonths = months.filter(m => {
+        const monthKey = `${m.getFullYear()}-${m.getMonth()}`;
+        const isPaid = quotas.some(q => q.userId === user.firestoreId && q.monthKey === monthKey);
+        // Só conta como dívida se o mês já passou ou é o atual, e não está pago
+        return !isPaid && (m.getFullYear() < now.getFullYear() || (m.getFullYear() === now.getFullYear() && m.getMonth() <= now.getMonth()));
+      });
+
+      const pendingAmount = debtMonths.length * totalMonthly;
+      const hasDebt = pendingAmount > 0.01;
       return (
         <div className="space-y-6">
           <div className="pt-2">
@@ -304,10 +337,49 @@
     }
 
     function AdminDashboard({ expenses, quotas, users, budgets }) {
-      const totalExpected = budgets[0]?.totalAmount || 0;
+      const sortedBudgets = [...budgets].sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+      const currentBudget = sortedBudgets[0];
+      const rfPerc = currentBudget?.reserveFundPercentage ?? 10;
+      const totalExpected = (currentBudget?.totalAmount || 0) * (1 + rfPerc / 100);
       const pendingExpensesAmount = expenses.filter(e => e.status === 'pending').reduce((acc, curr) => acc + curr.amount, 0);
-      const totalDebt = quotas.filter(q => q.status === 'pending').reduce((acc, curr) => acc + curr.amount, 0);
-      const collectedAmount = quotas.filter(q => q.status === 'paid').reduce((acc, curr) => acc + curr.amount, 0);
+
+      // Calcular montante total pago das quotas
+      const getMonths = (start, end) => {
+        const months = [];
+        if (!start || !end) return months;
+        let current = new Date(start);
+        const last = new Date(end);
+        while (current <= last) {
+          months.push(new Date(current));
+          current.setMonth(current.getMonth() + 1);
+        }
+        return months;
+      };
+
+      const months = currentBudget ? getMonths(currentBudget.startDate, currentBudget.endDate) : [];
+      const monthlyTotal = currentBudget ? currentBudget.totalAmount / 12 : 0;
+      
+      let collectedAmount = 0;
+      let totalDebt = 0;
+      const now = new Date();
+
+      users.filter(u => u.role !== 'admin').forEach(user => {
+        const perm = parseFloat(user.permilagem) || 0;
+        const quotaBase = (monthlyTotal * (perm / 1000));
+        const reserveFund = quotaBase * (rfPerc / 100);
+        const totalMonthly = quotaBase + reserveFund;
+
+        months.forEach(m => {
+          const monthKey = `${m.getFullYear()}-${m.getMonth()}`;
+          const isPaid = quotas.some(q => q.userId === user.firestoreId && q.monthKey === monthKey);
+          
+          if (isPaid) {
+            collectedAmount += totalMonthly;
+          } else if (m.getFullYear() < now.getFullYear() || (m.getFullYear() === now.getFullYear() && m.getMonth() <= now.getMonth())) {
+            totalDebt += totalMonthly;
+          }
+        });
+      });
 
       return (
         <div className="space-y-6">
@@ -899,6 +971,7 @@
       const [startDate, setStartDate] = useState('');
       const [endDate, setEndDate] = useState('');
       const [rubrics, setRubrics] = useState([{ name: '', value: '' }]);
+      const [reserveFundPercentage, setReserveFundPercentage] = useState(10);
       const [loading, setLoading] = useState(false);
       const [expandedId, setExpandedId] = useState(null);
 
@@ -910,11 +983,13 @@
           setStartDate(editingBudget.startDate || '');
           setEndDate(editingBudget.endDate || '');
           setRubrics(editingBudget.rubrics || [{ name: '', value: '' }]);
+          setReserveFundPercentage(editingBudget.reserveFundPercentage ?? 10);
           setShowForm(true);
         } else {
           setStartDate('');
           setEndDate('');
           setRubrics([{ name: '', value: '' }]);
+          setReserveFundPercentage(10);
         }
       }, [editingBudget]);
 
@@ -944,6 +1019,7 @@
           startDate,
           endDate,
           rubrics: rubrics.map(r => ({ name: r.name, value: parseFloat(r.value) || 0 })),
+          reserveFundPercentage: parseFloat(reserveFundPercentage) || 0,
           totalAmount,
           updatedAt: new Date().toISOString()
         };
@@ -997,6 +1073,14 @@
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-slate-500 ml-1">Data de Fim</label>
                   <input required type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-500 ml-1">Fundo de Reserva (%)</label>
+                <div className="w-full sm:w-32 relative">
+                  <input required type="number" step="0.1" value={reserveFundPercentage} onChange={e => setReserveFundPercentage(e.target.value)} className="w-full px-4 py-3 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500 pr-8" />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">%</span>
                 </div>
               </div>
 
@@ -1082,9 +1166,13 @@
                                 <td className="px-4 py-3 text-slate-900 font-bold text-right">{rubric.value.toFixed(2)} €</td>
                               </tr>
                             ))}
+                            <tr>
+                              <td className="px-4 py-3 text-slate-700 font-medium">Fundo de Reserva ({budget.reserveFundPercentage ?? 10}%)</td>
+                              <td className="px-4 py-3 text-slate-900 font-bold text-right">{(budget.totalAmount * ((budget.reserveFundPercentage ?? 10) / 100)).toFixed(2)} €</td>
+                            </tr>
                             <tr className="bg-blue-50/30">
-                              <td className="px-4 py-4 text-blue-900 font-bold">Total do Exercício</td>
-                              <td className="px-4 py-4 text-blue-700 font-black text-right text-lg">{budget.totalAmount.toFixed(2)} €</td>
+                              <td className="px-4 py-4 text-blue-900 font-bold">Total do Exercício (+ FR)</td>
+                              <td className="px-4 py-4 text-blue-700 font-black text-right text-lg">{(budget.totalAmount * (1 + (budget.reserveFundPercentage ?? 10) / 100)).toFixed(2)} €</td>
                             </tr>
                           </tbody>
                         </table>
@@ -1105,7 +1193,7 @@
       );
     }
 
-    function FractionsPage({ users, quotas, isAdmin, db, appId }) {
+    function FractionsPage({ users, quotas, isAdmin, db, appId, budgets }) {
       const [showForm, setShowForm] = useState(false);
       const [editingUser, setEditingUser] = useState(null);
       const [newName, setNewName] = useState('');
@@ -1114,6 +1202,25 @@
       const [newPermilagem, setNewPermilagem] = useState('');
       const [msg, setMsg] = useState({ type: '', text: '' });
       const [loading, setLoading] = useState(false);
+
+      const sortedBudgets = [...budgets].sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+      const currentBudget = sortedBudgets[0];
+      const rfPerc = currentBudget?.reserveFundPercentage ?? 10;
+      const monthlyTotal = currentBudget ? currentBudget.totalAmount / 12 : 0;
+
+      const getMonths = (start, end) => {
+        const months = [];
+        if (!start || !end) return months;
+        let current = new Date(start);
+        const last = new Date(end);
+        while (current <= last) {
+          months.push(new Date(current));
+          current.setMonth(current.getMonth() + 1);
+        }
+        return months;
+      };
+      const months = currentBudget ? getMonths(currentBudget.startDate, currentBudget.endDate) : [];
+      const now = new Date();
 
       useEffect(() => {
         if (editingUser) {
@@ -1183,8 +1290,20 @@
       };
 
       const fractionsList = users.map(user => {
-        const userQuotas = quotas.filter(q => q.userId === user.id);
-        const debt = userQuotas.filter(q => q.status === 'pending').reduce((acc, curr) => acc + curr.amount, 0);
+        if (user.role === 'admin') return { ...user, debt: 0 };
+        
+        const perm = parseFloat(user.permilagem) || 0;
+        const quotaBase = (monthlyTotal * (perm / 1000));
+        const reserveFund = quotaBase * (rfPerc / 100);
+        const totalMonthly = quotaBase + reserveFund;
+
+        const debtMonths = months.filter(m => {
+          const monthKey = `${m.getFullYear()}-${m.getMonth()}`;
+          const isPaid = quotas.some(q => q.userId === user.firestoreId && q.monthKey === monthKey);
+          return !isPaid && (m.getFullYear() < now.getFullYear() || (m.getFullYear() === now.getFullYear() && m.getMonth() <= now.getMonth()));
+        });
+
+        const debt = debtMonths.length * totalMonthly;
         return { ...user, debt };
       });
 
@@ -1257,6 +1376,131 @@
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      );
+    }
+
+    function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId }) {
+      const sortedBudgets = [...budgets].sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+      const currentBudget = sortedBudgets[0];
+
+      if (!currentBudget) {
+        return (
+          <div className="p-12 text-center bg-white rounded-3xl border border-dashed border-slate-200">
+            <Wallet className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+            <p className="text-slate-500 font-medium">Por favor, configure um orçamento primeiro.</p>
+          </div>
+        );
+      }
+
+      const getMonths = (start, end) => {
+        const months = [];
+        let current = new Date(start);
+        const last = new Date(end);
+        while (current <= last) {
+          months.push(new Date(current));
+          current.setMonth(current.getMonth() + 1);
+        }
+        return months;
+      };
+
+      const months = getMonths(currentBudget.startDate, currentBudget.endDate);
+      const rfPerc = currentBudget.reserveFundPercentage ?? 10;
+      const monthlyTotal = currentBudget.totalAmount / 12;
+
+      const togglePaid = async (userId, monthKey) => {
+        if (!isAdmin) return;
+        const quotaId = `${userId}_${monthKey}`;
+        const existing = quotas.find(q => q.firestoreId === quotaId);
+
+        try {
+          if (existing) {
+            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quotas', quotaId));
+          } else {
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quotas', quotaId), {
+              userId,
+              monthKey,
+              status: 'paid',
+              updatedAt: new Date().toISOString()
+            });
+          }
+        } catch (err) {
+          alert('Erro ao atualizar estado de pagamento: ' + err.message);
+        }
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="pt-2">
+            <h2 className="text-[26px] font-bold text-slate-800">Conta Corrente</h2>
+            <p className="text-slate-500 text-sm mt-1">Controlo de quotas pagas por condómino</p>
+          </div>
+
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden overflow-x-auto">
+            <table className="w-full text-left text-sm border-collapse">
+              <thead>
+                <tr className="bg-slate-50 text-slate-500 border-b border-slate-100">
+                  <th className="px-4 py-4 font-semibold sticky left-0 bg-slate-50 min-w-[150px] z-10">Fração / Mês</th>
+                  {months.map((m, idx) => (
+                    <th key={idx} className="px-4 py-4 font-semibold text-center min-w-[120px]">
+                      {m.toLocaleDateString('pt-PT', { month: 'short', year: '2-digit' })}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {users.filter(u => u.role !== 'admin').map(user => {
+                  const perm = parseFloat(user.permilagem) || 0;
+                  const quotaBase = (monthlyTotal * (perm / 1000));
+                  const reserveFund = quotaBase * (rfPerc / 100);
+                  const total = quotaBase + reserveFund;
+
+                  return (
+                    <tr key={user.firestoreId} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-4 py-4 sticky left-0 bg-white group-hover:bg-slate-50 z-10 border-r border-slate-50">
+                        <p className="font-bold text-slate-900">{user.fraction}</p>
+                        <p className="text-[11px] text-slate-400 truncate w-32">{user.name}</p>
+                      </td>
+                      {months.map((m, idx) => {
+                        const monthKey = `${m.getFullYear()}-${m.getMonth()}`;
+                        const isPaid = quotas.some(q => q.userId === user.firestoreId && q.monthKey === monthKey);
+                        return (
+                          <td key={idx} className="px-4 py-4 text-center">
+                            <button 
+                              onClick={() => togglePaid(user.firestoreId, monthKey)}
+                              disabled={!isAdmin}
+                              className={`w-full p-2 rounded-xl transition-all border ${isPaid ? 'bg-green-50 border-green-100 text-green-700' : 'bg-white border-slate-100 text-slate-400 hover:border-blue-200'}`}
+                            >
+                              {isPaid ? (
+                                <div className="flex flex-col items-center">
+                                  <CheckCircle className="w-4 h-4 mb-0.5" />
+                                  <span className="text-[10px] font-bold uppercase tracking-tight">Pago</span>
+                                </div>
+                              ) : (
+                                <div className="flex flex-col items-center opacity-60 group-hover:opacity-100">
+                                  <div className="text-[10px] font-medium leading-tight">
+                                    <div>Q: {quotaBase.toFixed(2)}€</div>
+                                    <div>FR: {reserveFund.toFixed(2)}€</div>
+                                    <div className="border-t border-slate-200 mt-1 pt-0.5 font-bold text-slate-600">Σ {total.toFixed(2)}€</div>
+                                  </div>
+                                </div>
+                              )}
+                            </button>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-slate-400 px-2">
+            <div className="w-3 h-3 bg-green-50 border border-green-100 rounded"></div>
+            <span>Pago</span>
+            <div className="w-3 h-3 bg-white border border-slate-100 rounded ml-4"></div>
+            <span>Pendente (Q: Quota, FR: Fundo Reserva, Σ: Total)</span>
           </div>
         </div>
       );
