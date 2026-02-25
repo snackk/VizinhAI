@@ -56,7 +56,7 @@
 
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
     import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
-    import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, updateDoc, deleteDoc, query, where } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+    import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, updateDoc, deleteDoc, query, where, runTransaction, increment } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
     import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js';
 
     let firebaseConfig = {};
@@ -2423,10 +2423,31 @@
         }
 
         try {
+          // 1. Incrementar o contador de recibos de forma atómica
+          let receiptNumber = 1;
+          const condoRef = doc(db, 'condos', selectedCondoId);
+          
+          try {
+            await runTransaction(db, async (transaction) => {
+              const condoDoc = await transaction.get(condoRef);
+              if (!condoDoc.exists()) {
+                throw "Documento do condomínio não existe!";
+              }
+              receiptNumber = (condoDoc.data().lastReceiptNumber || 0) + 1;
+              transaction.update(condoRef, { lastReceiptNumber: receiptNumber });
+            });
+          } catch (transErr) {
+            console.error("Erro na transação do contador:", transErr);
+            // Fallback para evitar parar o processo se a transação falhar por algum motivo de concorrência extrema
+            // mas aqui é preferível falhar para garantir unicidade se for crítico.
+            throw transErr;
+          }
+
           await setDoc(doc(db, 'condos', selectedCondoId, 'quotas', quotaId), {
             userId,
             monthKey,
             status: 'paid',
+            receiptNumber,
             updatedAt: new Date().toISOString()
           });
           
@@ -2466,6 +2487,12 @@
 
                 const nifY = 25 + (addressLines.length * 5);
                 docPdf.text(`NIF: ${condo?.nif || 'N/A'}`, 15, nifY);
+
+                // --- NÚMERO DO RECIBO ---
+                docPdf.setFontSize(12);
+                docPdf.setFont("helvetica", "bold");
+                docPdf.text(`RECIBO Nº ${receiptNumber}`, 15, 55);
+                docPdf.setFontSize(10);
 
                 // --- CABEÇALHO DIREITO (Dados do Condómino) ---
                 const rightX = 195;
@@ -2557,7 +2584,7 @@
                 to: user.email,
                 condoId: selectedCondoId,
                 message: {
-                  subject: `Recibo de Pagamento - Quota ${monthName} ${year} - ${user.fraction}`,
+                  subject: `Recibo ${receiptNumber} - Quota de ${monthName} ${year} - ${user.fraction}`,
                   html: `
                     <p>Exmo. condómino<br>${user.name}</p>
                     <p>Em anexo segue o seu recibo de pagamento referente ao ${condoName}.</p>
@@ -2569,7 +2596,7 @@
               if (pdfBase64) {
                 mailData.message.attachments = [
                   {
-                    filename: `Recibo_${user.fraction}_${monthName}_${year}.pdf`,
+                    filename: `Recibo_${receiptNumber}_Fração_${user.fraction}.pdf`,
                     content: pdfBase64,
                     encoding: 'base64'
                   }
