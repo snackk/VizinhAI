@@ -87,6 +87,7 @@
       const [expenses, setExpenses] = useState([]);
       const [budgets, setBudgets] = useState([]);
       const [documents, setDocuments] = useState([]);
+      const [condo, setCondo] = useState(null);
 
       useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -115,8 +116,13 @@
         const unsubExpenses = onSnapshot(getCol('expenses'), (snap) => setExpenses(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))));
         const unsubBudgets = onSnapshot(getCol('budgets'), (snap) => setBudgets(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))));
         const unsubDocs = onSnapshot(getCol('documents'), (snap) => setDocuments(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))));
+        const unsubCondo = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'condo', 'info'), (docSnap) => {
+          if (docSnap.exists()) {
+            setCondo({ firestoreId: docSnap.id, ...docSnap.data() });
+          }
+        });
 
-        return () => { unsubUsers(); unsubQuotas(); unsubExpenses(); unsubBudgets(); unsubDocs(); };
+        return () => { unsubUsers(); unsubQuotas(); unsubExpenses(); unsubBudgets(); unsubDocs(); unsubCondo(); };
       }, [firebaseUser]);
 
       const handleLogout = () => signOut(auth);
@@ -138,6 +144,7 @@
       const renderContent = () => {
         switch (activeTab) {
           case 'dashboard': return isAdmin ? <AdminDashboard expenses={expenses} quotas={quotas} users={users} budgets={budgets} /> : <UserDashboard user={currentUser} quotas={quotas} expenses={expenses} />;
+          case 'condo': return <CondoPage condo={condo} isAdmin={isAdmin} db={db} appId={appId} />;
           case 'documentos': return <DocumentsPage documents={documents} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} storage={storage} />;
           case 'despesas': return <ExpensesPage expenses={expenses} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} />;
           case 'orcamentos': return <BudgetsPage budgets={budgets} isAdmin={isAdmin} db={db} appId={appId} />;
@@ -162,6 +169,7 @@
             
             <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
               <NavItem icon={<PieChart />} label="Resumo" active={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setIsMobileMenuOpen(false); }} />
+              <NavItem icon={<Home />} label="Condomínio" active={activeTab === 'condo'} onClick={() => { setActiveTab('condo'); setIsMobileMenuOpen(false); }} />
               <NavItem icon={<FolderOpen />} label="Documentos" active={activeTab === 'documentos'} onClick={() => { setActiveTab('documentos'); setIsMobileMenuOpen(false); }} />
               <NavItem icon={<Receipt />} label="Despesas" active={activeTab === 'despesas'} onClick={() => { setActiveTab('despesas'); setIsMobileMenuOpen(false); }} />
               <NavItem icon={<Wallet />} label="Orçamentos" active={activeTab === 'orcamentos'} onClick={() => { setActiveTab('orcamentos'); setIsMobileMenuOpen(false); }} />
@@ -333,6 +341,109 @@
       return <div className="pt-2"><h2 className="text-[26px] font-bold text-slate-800">Documentos</h2><p className="text-slate-500">Módulo de Documentos</p></div>;
     }
 
+    function CondoPage({ condo, isAdmin, db, appId }) {
+      const [isEditing, setIsEditing] = useState(false);
+      const [formData, setFormData] = useState(condo || {});
+      const [saving, setSaving] = useState(false);
+
+      useEffect(() => { if (condo) setFormData(condo); }, [condo]);
+
+      const handleSave = async (e) => {
+        e.preventDefault();
+        setSaving(true);
+        try {
+          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'condo', 'info'), formData);
+          setIsEditing(false);
+        } catch (err) {
+          alert('Erro ao guardar: ' + err.message);
+        } finally {
+          setSaving(false);
+        }
+      };
+
+      if (!condo && !isEditing) return <div className="p-8 text-center">A carregar dados do condomínio...</div>;
+
+      return (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center pt-2">
+            <h2 className="text-[26px] font-bold text-slate-800 tracking-tight">Condomínio</h2>
+            {isAdmin && !isEditing && (
+              <button onClick={() => setIsEditing(true)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl font-semibold hover:bg-blue-700 transition-colors">
+                <Settings className="w-4 h-4" /> Editar
+              </button>
+            )}
+          </div>
+
+          {isEditing ? (
+            <form onSubmit={handleSave} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+              <div>
+                <label className="block text-sm font-semibold mb-1 ml-1 text-slate-700">Nome do Condomínio</label>
+                <input required className="w-full px-4 py-3 border border-slate-200 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-1 ml-1 text-slate-700">Morada</label>
+                <input required className="w-full px-4 py-3 border border-slate-200 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={formData.address || ''} onChange={e => setFormData({...formData, address: e.target.value})} />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-1 ml-1 text-slate-700">Contribuinte (NIF)</label>
+                  <input required className="w-full px-4 py-3 border border-slate-200 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={formData.nif || ''} onChange={e => setFormData({...formData, nif: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-1 ml-1 text-slate-700">IBAN</label>
+                  <input required className="w-full px-4 py-3 border border-slate-200 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={formData.iban || ''} onChange={e => setFormData({...formData, iban: e.target.value})} />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="submit" disabled={saving} className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold disabled:opacity-50">
+                  {saving ? 'A guardar...' : 'Guardar Alterações'}
+                </button>
+                <button type="button" onClick={() => setIsEditing(false)} className="px-6 py-3 border border-slate-200 rounded-xl font-semibold hover:bg-slate-50">Cancelar</button>
+              </div>
+            </form>
+          ) : (
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="bg-gradient-to-br from-blue-600 to-blue-700 p-8 text-white">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm">
+                    <Home className="w-8 h-8 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold leading-tight">{condo.name}</h3>
+                    <p className="text-blue-100 mt-1 flex items-center gap-1.5"><Settings className="w-4 h-4" /> Detalhes da Entidade</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Morada Oficial</p>
+                  <p className="text-slate-700 font-medium text-lg leading-relaxed">{condo.address}</p>
+                </div>
+                
+                <div className="space-y-6">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Contribuinte (NIF)</p>
+                    <p className="text-slate-900 font-bold text-xl tracking-tight">{condo.nif}</p>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">IBAN para Pagamentos</p>
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center justify-between">
+                      <p className="text-blue-700 font-mono font-bold text-lg">{condo.iban}</p>
+                      <button onClick={() => {navigator.clipboard.writeText(condo.iban); alert('IBAN copiado!');}} className="text-blue-600 hover:bg-blue-100 p-2 rounded-lg transition-colors">
+                         <FileText className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
     function ExpensesPage({ expenses, isAdmin, currentUser, db, appId }) {
       return <div className="pt-2"><h2 className="text-[26px] font-bold text-slate-800">Despesas</h2><p className="text-slate-500">Módulo de Despesas</p></div>;
     }
@@ -359,7 +470,7 @@
           const userCred = await createUserWithEmailAndPassword(secondaryAuth, newEmail, tempPassword);
 
           await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userCred.user.uid), {
-            id: userCred.user.uid, name: newName, email: newEmail, fraction: newFraction, role: 'user'
+            id: userCred.user.uid, name: newName, email: newEmail, fraction: newFraction, role: 'user', condoId: appId
           });
           await sendPasswordResetEmail(auth, newEmail);
           await signOut(secondaryAuth);
