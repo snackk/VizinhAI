@@ -68,6 +68,12 @@ service cloud.firestore {
         allow write: if isAdmin(appId);
       }
 
+      // Document Types Collection
+      match /docTypes/{typeId} {
+        allow read: if isAuth();
+        allow write: if isAdmin(appId);
+      }
+
       // Condominium Details
       match /condo/info {
         allow read: if isAuth();
