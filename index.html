@@ -1755,35 +1755,40 @@
             status: 'paid',
             updatedAt: new Date().toISOString()
           });
+          
+          // Enviar e-mail de recibo (em bloco separado para não bloquear o pagamento)
+          try {
+            if (user && user.email) {
+              const perm = parseFloat(user.permilagem) || 0;
+              const quotaBase = (monthlyTotal * (perm / 1000));
+              const reserveFund = quotaBase * (rfPerc / 100);
+              const total = quotaBase + reserveFund;
+              const dateObj = new Date();
+              const today = dateObj.toLocaleDateString('pt-PT');
+              const condoName = condo?.name || 'Condomínio';
 
-          // Enviar e-mail de recibo
-          if (user && user.email) {
-            const perm = parseFloat(user.permilagem) || 0;
-            const quotaBase = (monthlyTotal * (perm / 1000));
-            const reserveFund = quotaBase * (rfPerc / 100);
-            const total = quotaBase + reserveFund;
-            const dateObj = new Date();
-            const today = dateObj.toLocaleDateString('pt-PT');
-            const condoName = condo?.name || 'Condomínio';
-
-            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'mail'), {
-              to: user.email,
-              message: {
-                subject: `Recibo de Pagamento - Quota ${monthName} ${year} - ${user.fraction}`,
-                html: `
-                  <p>O Condomínio ${condoName} comprova que a quota referente ao mês ${monthName} foi paga no dia ${today} para a fração ${user.fraction}.</p>
-                  <p>O presente email serve como recibo de pagamento.</p>
-                  <hr>
-                  <p><strong>Detalhes do Pagamento:</strong></p>
-                  <ul>
-                    <li><strong>Fração:</strong> ${user.fraction}</li>
-                    <li><strong>Mês de Referência:</strong> ${monthName} ${year}</li>
-                    <li><strong>Valor Pago:</strong> ${total.toFixed(2)} €</li>
-                    <li><strong>Data de Pagamento:</strong> ${today}</li>
-                  </ul>
-                `
-              }
-            });
+              await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'mail'), {
+                to: user.email,
+                message: {
+                  subject: `Recibo de Pagamento - Quota ${monthName} ${year} - ${user.fraction}`,
+                  html: `
+                    <p>O Condomínio ${condoName} comprova que a quota referente ao mês ${monthName} foi paga no dia ${today} para a fração ${user.fraction}.</p>
+                    <p>O presente email serve como recibo de pagamento.</p>
+                    <hr>
+                    <p><strong>Detalhes do Pagamento:</strong></p>
+                    <ul>
+                      <li><strong>Fração:</strong> ${user.fraction}</li>
+                      <li><strong>Mês de Referência:</strong> ${monthName} ${year}</li>
+                      <li><strong>Valor Pago:</strong> ${total.toFixed(2)} €</li>
+                      <li><strong>Data de Pagamento:</strong> ${today}</li>
+                    </ul>
+                  `
+                }
+              });
+            }
+          } catch (mailErr) {
+            console.error("Erro ao enviar email:", mailErr);
+            alert('Quota marcada como paga, mas houve um erro ao enviar o e-mail: ' + mailErr.message + '\n\nCertifique-se de que adicionou a regra para a coleção "mail" no Firestore.');
           }
         } catch (err) {
           alert('Erro ao atualizar estado de pagamento: ' + err.message);
