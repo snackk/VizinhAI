@@ -57,6 +57,7 @@ service cloud.firestore {
     // Global Condos collection
     match /condos/{condoId} {
       allow read: if isMember(condoId);
+      allow list: if isBackoffice();
       allow create, delete: if isBackoffice();
       allow update: if isAdmin(condoId);
 
