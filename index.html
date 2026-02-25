@@ -417,7 +417,7 @@
       }
 
       if (!isFirebaseReady) return <div className="h-screen w-full flex items-center justify-center bg-slate-50">A carregar o sistema...</div>;
-      if (!firebaseUser || !currentUser) return <LoginScreen />;
+      if (!firebaseUser || !currentUser) return <LoginScreen t={t} />;
 
       const isAdmin = currentUser.role === 'admin' || currentUser.role === 'backoffice';
       const isBackoffice = currentUser.role === 'backoffice';
@@ -451,7 +451,7 @@
       };
 
       if (!isFirebaseReady) return <div className="h-screen w-full flex items-center justify-center bg-slate-50">A carregar o sistema...</div>;
-      if (!firebaseUser || !currentUser) return <LoginScreen />;
+      if (!firebaseUser || !currentUser) return <LoginScreen t={t} />;
 
       if (!selectedCondoId && currentUser.condoIds?.length > 1 || (!selectedCondoId && isBackoffice && activeTab !== 'condos')) {
         return <CondoSelectionScreen currentUser={currentUser} allCondos={allCondos} onSelect={handleCondoSelect} t={t} />;
@@ -727,7 +727,7 @@
       );
     }
 
-    function LoginScreen() {
+    function LoginScreen({ t }) {
       const [email, setEmail] = useState('');
       const [password, setPassword] = useState('');
       const [error, setError] = useState('');
