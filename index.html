@@ -86,6 +86,10 @@
         budgets: "Orçamentos",
         currentAccount: "Conta Corrente",
         fractions: "Frações",
+        condos: "Condomínios",
+        selectCondo: "Selecionar Condomínio",
+        chooseCondo: "Escolha o condomínio que deseja visualizar",
+        backoffice: "Backoffice",
         settings: "Definições",
         summary: "Resumo",
         logout: "Sair da Conta",
@@ -120,7 +124,17 @@
         currentAdmin: "Administrador em Funções",
         adminName: "Nome",
         adminEmail: "E-mail",
-        adminPhone: "Telefone"
+        adminPhone: "Telefone",
+        noCondos: "Nenhum condomínio associado.",
+        createCondo: "Criar Condomínio",
+        editCondo: "Editar Condomínio",
+        deleteCondo: "Eliminar Condomínio",
+        condoName: "Nome do Condomínio",
+        condoAddress: "Morada",
+        condoNif: "NIF",
+        condoIban: "IBAN",
+        confirmDeleteCondo: "Tem a certeza que deseja eliminar este condomínio? Todos os dados associados serão perdidos.",
+        switchCondo: "Mudar Condomínio"
       },
       en: {
         dashboard: "Dashboard",
@@ -130,6 +144,10 @@
         budgets: "Budgets",
         currentAccount: "Current Account",
         fractions: "Units",
+        condos: "Condos",
+        selectCondo: "Select Condo",
+        chooseCondo: "Choose the condo you want to view",
+        backoffice: "Backoffice",
         settings: "Settings",
         summary: "Summary",
         logout: "Logout",
@@ -164,7 +182,17 @@
         currentAdmin: "Current Administrator",
         adminName: "Name",
         adminEmail: "Email",
-        adminPhone: "Phone"
+        adminPhone: "Phone",
+        noCondos: "No condos associated.",
+        createCondo: "Create Condo",
+        editCondo: "Edit Condo",
+        deleteCondo: "Delete Condo",
+        condoName: "Condo Name",
+        condoAddress: "Address",
+        condoNif: "NIF",
+        condoIban: "IBAN",
+        confirmDeleteCondo: "Are you sure you want to delete this condo? All associated data will be lost.",
+        switchCondo: "Switch Condo"
       },
       fr: {
         dashboard: "Tableau de bord",
@@ -174,6 +202,10 @@
         budgets: "Budgets",
         currentAccount: "Compte Courant",
         fractions: "Unités",
+        condos: "Copropriétés",
+        selectCondo: "Sélectionner la copropriété",
+        chooseCondo: "Choisissez la copropriété que vous souhaitez visualiser",
+        backoffice: "Backoffice",
         settings: "Paramètres",
         summary: "Résumé",
         logout: "Déconnexion",
@@ -208,7 +240,17 @@
         currentAdmin: "Administrateur Actuel",
         adminName: "Nom",
         adminEmail: "E-mail",
-        adminPhone: "Téléphone"
+        adminPhone: "Téléphone",
+        noCondos: "Aucune copropriété associée.",
+        createCondo: "Créer une copropriété",
+        editCondo: "Modifier la copropriété",
+        deleteCondo: "Supprimer la copropriété",
+        condoName: "Nom de la copropriété",
+        condoAddress: "Adresse",
+        condoNif: "NIF",
+        condoIban: "IBAN",
+        confirmDeleteCondo: "Êtes-vous sûr de vouloir supprimer cette copropriété ? Toutes les données associées seront perdues.",
+        switchCondo: "Changer de copropriété"
       }
     };
 
@@ -216,6 +258,8 @@
       const [firebaseUser, setFirebaseUser] = useState(null);
       const [isFirebaseReady, setIsFirebaseReady] = useState(false);
       const [currentUser, setCurrentUser] = useState(null);
+      const [selectedCondoId, setSelectedCondoId] = useState(null);
+      const [allCondos, setAllCondos] = useState([]);
       const [activeTab, setActiveTab] = useState('dashboard');
       const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
       const [lang, setLang] = useState('pt');
@@ -258,14 +302,34 @@
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
           setFirebaseUser(user);
           if (user) {
-            const userDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid);
+            // Utilizadores na coleção global 'users'
+            const userDocRef = doc(db, 'users', user.uid);
             onSnapshot(userDocRef, (docSnap) => {
               if (docSnap.exists()) {
-                setCurrentUser({ firestoreId: docSnap.id, ...docSnap.data() });
+                const userData = docSnap.data();
+                setCurrentUser({ firestoreId: docSnap.id, ...userData });
+                
+                if (!selectedCondoId) {
+                  if (userData.role !== 'backoffice' && userData.condoIds?.length === 1) {
+                    setSelectedCondoId(userData.condoIds[0]);
+                  }
+                }
+              } else {
+                // Legado
+                const legacyUserDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid);
+                onSnapshot(legacyUserDocRef, (legacySnap) => {
+                  if (legacySnap.exists()) {
+                    setCurrentUser({ firestoreId: legacySnap.id, ...legacySnap.data(), condoIds: [appId] });
+                    if (!selectedCondoId) setSelectedCondoId(appId);
+                  } else {
+                    setCurrentUser(null);
+                  }
+                });
               }
             });
           } else {
             setCurrentUser(null);
+            setSelectedCondoId(null);
           }
           setIsFirebaseReady(true);
         });
@@ -274,7 +338,19 @@
 
       useEffect(() => {
         if (!firebaseUser) return;
-        const getCol = (colName) => collection(db, 'artifacts', appId, 'public', 'data', colName);
+        const unsubCondos = onSnapshot(collection(db, 'condos'), (snap) => {
+          setAllCondos(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() })));
+        });
+        return () => unsubCondos();
+      }, [firebaseUser]);
+
+      useEffect(() => {
+        if (!firebaseUser || !selectedCondoId) {
+          setUsers([]); setQuotas([]); setExpenses([]); setBudgets([]); setDocuments([]); setDocTypes([]); setCondo(null);
+          return;
+        }
+
+        const getCol = (colName) => collection(db, 'condos', selectedCondoId, colName);
 
         const unsubUsers = onSnapshot(getCol('users'), (snap) => setUsers(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))));
         const unsubQuotas = onSnapshot(getCol('quotas'), (snap) => setQuotas(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))));
@@ -282,14 +358,14 @@
         const unsubBudgets = onSnapshot(getCol('budgets'), (snap) => setBudgets(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))));
         const unsubDocs = onSnapshot(getCol('documents'), (snap) => setDocuments(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))));
         const unsubDocTypes = onSnapshot(getCol('docTypes'), (snap) => setDocTypes(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))));
-        const unsubCondo = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'condo', 'info'), (docSnap) => {
+        const unsubCondo = onSnapshot(doc(db, 'condos', selectedCondoId), (docSnap) => {
           if (docSnap.exists()) {
             setCondo({ firestoreId: docSnap.id, ...docSnap.data() });
           }
         });
 
         return () => { unsubUsers(); unsubQuotas(); unsubExpenses(); unsubBudgets(); unsubDocs(); unsubDocTypes(); unsubCondo(); };
-      }, [firebaseUser]);
+      }, [firebaseUser, selectedCondoId]);
 
       const handleLogout = () => signOut(auth);
 
@@ -305,21 +381,45 @@
       if (!isFirebaseReady) return <div className="h-screen w-full flex items-center justify-center bg-slate-50">A carregar o sistema...</div>;
       if (!firebaseUser || !currentUser) return <LoginScreen />;
 
-      const isAdmin = currentUser.role === 'admin';
+      const isAdmin = currentUser.role === 'admin' || currentUser.role === 'backoffice';
+      const isBackoffice = currentUser.role === 'backoffice';
 
       const renderContent = () => {
+        if (!selectedCondoId && !isBackoffice) {
+           return (
+             <div className="flex flex-col items-center justify-center p-12 text-center bg-white rounded-3xl border border-slate-100 shadow-sm">
+               <AlertCircle className="w-12 h-12 text-orange-400 mb-4" />
+               <h2 className="text-xl font-bold text-slate-800">{t('noCondos')}</h2>
+             </div>
+           );
+        }
+
+        if (!selectedCondoId && isBackoffice && activeTab !== 'condos') {
+          setActiveTab('condos');
+        }
+
         switch (activeTab) {
           case 'dashboard': return isAdmin ? <AdminDashboard expenses={expenses} quotas={quotas} users={users} budgets={budgets} t={t} /> : <UserDashboard user={currentUser} quotas={quotas} expenses={expenses} budgets={budgets} users={users} t={t} />;
-          case 'condo': return <CondoPage condo={condo} isAdmin={isAdmin} db={db} appId={appId} users={users} t={t} />;
-          case 'documentos': return <DocumentsPage documents={documents} docTypes={docTypes} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} storage={storage} />;
-          case 'despesas': return <ExpensesPage expenses={expenses} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} />;
-          case 'orcamentos': return <BudgetsPage budgets={budgets} isAdmin={isAdmin} db={db} appId={appId} />;
-          case 'conta-corrente': return isAdmin ? <CurrentAccountPage budgets={budgets} users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} condo={condo} t={t} /> : null;
-          case 'fracoes': return <FractionsPage users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} budgets={budgets} currentUser={currentUser} t={t} />;
+          case 'condo': return <CondoPage condo={condo} isAdmin={isAdmin} db={db} appId={appId} users={users} t={t} selectedCondoId={selectedCondoId} />;
+          case 'documentos': return <DocumentsPage documents={documents} docTypes={docTypes} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} storage={storage} selectedCondoId={selectedCondoId} />;
+          case 'despesas': return <ExpensesPage expenses={expenses} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} selectedCondoId={selectedCondoId} />;
+          case 'orcamentos': return <BudgetsPage budgets={budgets} isAdmin={isAdmin} db={db} appId={appId} selectedCondoId={selectedCondoId} />;
+          case 'conta-corrente': return isAdmin ? <CurrentAccountPage budgets={budgets} users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} condo={condo} t={t} selectedCondoId={selectedCondoId} /> : null;
+          case 'fracoes': return <FractionsPage users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} budgets={budgets} currentUser={currentUser} t={t} selectedCondoId={selectedCondoId} />;
           case 'definicoes': return <SettingsPage currentUser={currentUser} db={db} appId={appId} t={t} />;
+          case 'condos': return isBackoffice ? <CondosPage allCondos={allCondos} db={db} t={t} /> : null;
           default: return <AdminDashboard />;
         }
       };
+
+      if (!isFirebaseReady) return <div className="h-screen w-full flex items-center justify-center bg-slate-50">A carregar o sistema...</div>;
+      if (!firebaseUser || !currentUser) return <LoginScreen />;
+
+      if (!selectedCondoId && currentUser.condoIds?.length > 1 || (!selectedCondoId && isBackoffice && activeTab !== 'condos')) {
+        return <CondoSelectionScreen currentUser={currentUser} allCondos={allCondos} onSelect={setSelectedCondoId} t={t} />;
+      }
+
+      const userRoleLabel = isBackoffice ? t('backoffice') : (isAdmin ? 'Admin' : 'Condómino');
 
       return (
         <div className="flex h-screen bg-slate-50 font-sans text-slate-800 safe-pl safe-pr">
@@ -335,16 +435,26 @@
             </div>
             
             <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-              <NavItem icon={<PieChart />} label={t('summary')} active={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setIsMobileMenuOpen(false); }} />
-              <NavItem icon={<Home />} label={t('condo')} active={activeTab === 'condo'} onClick={() => { setActiveTab('condo'); setIsMobileMenuOpen(false); }} />
-              <NavItem icon={<FolderOpen />} label={t('documents')} active={activeTab === 'documentos'} onClick={() => { setActiveTab('documentos'); setIsMobileMenuOpen(false); }} />
-              <NavItem icon={<Receipt />} label={t('expenses')} active={activeTab === 'despesas'} onClick={() => { setActiveTab('despesas'); setIsMobileMenuOpen(false); }} />
-              <NavItem icon={<Wallet />} label={t('budgets')} active={activeTab === 'orcamentos'} onClick={() => { setActiveTab('orcamentos'); setIsMobileMenuOpen(false); }} />
-              {isAdmin && <NavItem icon={<TrendingUp />} label={t('currentAccount')} active={activeTab === 'conta-corrente'} onClick={() => { setActiveTab('conta-corrente'); setIsMobileMenuOpen(false); }} />}
-              <NavItem icon={<Users />} label={t('fractions')} active={activeTab === 'fracoes'} onClick={() => { setActiveTab('fracoes'); setIsMobileMenuOpen(false); }} />
+              {isBackoffice && <NavItem icon={<ShieldAlert />} label={t('condos')} active={activeTab === 'condos'} onClick={() => { setActiveTab('condos'); setIsMobileMenuOpen(false); }} />}
+              {(selectedCondoId || !isBackoffice) && (
+                <>
+                  <NavItem icon={<PieChart />} label={t('summary')} active={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setIsMobileMenuOpen(false); }} />
+                  <NavItem icon={<Home />} label={t('condo')} active={activeTab === 'condo'} onClick={() => { setActiveTab('condo'); setIsMobileMenuOpen(false); }} />
+                  <NavItem icon={<FolderOpen />} label={t('documents')} active={activeTab === 'documentos'} onClick={() => { setActiveTab('documentos'); setIsMobileMenuOpen(false); }} />
+                  <NavItem icon={<Receipt />} label={t('expenses')} active={activeTab === 'despesas'} onClick={() => { setActiveTab('despesas'); setIsMobileMenuOpen(false); }} />
+                  <NavItem icon={<Wallet />} label={t('budgets')} active={activeTab === 'orcamentos'} onClick={() => { setActiveTab('orcamentos'); setIsMobileMenuOpen(false); }} />
+                  {isAdmin && <NavItem icon={<TrendingUp />} label={t('currentAccount')} active={activeTab === 'conta-corrente'} onClick={() => { setActiveTab('conta-corrente'); setIsMobileMenuOpen(false); }} />}
+                  <NavItem icon={<Users />} label={t('fractions')} active={activeTab === 'fracoes'} onClick={() => { setActiveTab('fracoes'); setIsMobileMenuOpen(false); }} />
+                </>
+              )}
             </nav>
             
             <div className="p-4 border-t border-slate-100 shrink-0">
+              {(isBackoffice || currentUser.condoIds?.length > 1) && (
+                <button onClick={() => setSelectedCondoId(null)} className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium text-blue-600 rounded-xl hover:bg-blue-50 transition-colors mb-2">
+                  <Calendar className="w-5 h-5" /> {t('switchCondo')}
+                </button>
+              )}
               <NavItem icon={<Settings />} label={t('settings')} active={activeTab === 'definicoes'} onClick={() => { setActiveTab('definicoes'); setIsMobileMenuOpen(false); }} />
               <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-xl mt-2 mb-4">
                 <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg">
@@ -352,7 +462,7 @@
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-slate-900 truncate">{currentUser?.name}</p>
-                  <p className="text-xs text-slate-500 truncate">{currentUser?.fraction} ({currentUser?.permilagem || 0}‰) • {isAdmin ? 'Admin' : 'Condómino'}</p>
+                  <p className="text-xs text-slate-500 truncate">{currentUser?.fraction || (isBackoffice ? 'Admin' : '')} {currentUser?.permilagem ? `(${currentUser.permilagem}‰)` : ''} • {userRoleLabel}</p>
                 </div>
               </div>
               <button onClick={handleLogout} className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium text-red-600 rounded-xl hover:bg-red-50 transition-colors">
@@ -360,12 +470,17 @@
               </button>
             </div>
           </aside>
-
+          
           <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
             <header className="mobile-header bg-blue-600 text-white h-16 flex items-center justify-between px-4 lg:hidden shrink-0 shadow-md">
               <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 -ml-2 text-white hover:bg-blue-700 rounded-full transition-colors"><Menu className="w-6 h-6" /></button>
-              <span className="font-semibold text-lg tracking-wide">VizinhAI</span>
-              <div className="w-6" />
+              <div className="flex flex-col items-center">
+                <span className="font-semibold text-lg tracking-wide">VizinhAI</span>
+                {condo && <span className="text-[10px] opacity-80 uppercase font-bold">{condo.name}</span>}
+              </div>
+              {(isBackoffice || currentUser.condoIds?.length > 1) ? (
+                <button onClick={() => setSelectedCondoId(null)} className="p-2 text-white hover:bg-blue-700 rounded-full transition-colors"><Calendar className="w-5 h-5" /></button>
+              ) : <div className="w-10" />}
             </header>
 
             <div className="flex-1 overflow-y-auto p-4 md:p-8 safe-pb bg-slate-50/50">
@@ -374,6 +489,165 @@
               </div>
             </div>
           </main>
+        </div>
+      );
+    }
+
+    function CondoSelectionScreen({ currentUser, allCondos, onSelect, t }) {
+      const myCondos = allCondos.filter(c => currentUser.role === 'backoffice' || currentUser.condoIds?.includes(c.firestoreId));
+
+      return (
+        <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4 safe-pt safe-pb">
+          <div className="w-full max-w-2xl bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100">
+            <div className="bg-blue-600 p-8 text-center text-white">
+              <h1 className="text-2xl font-bold">{t('selectCondo')}</h1>
+              <p className="opacity-80 mt-2">{t('chooseCondo')}</p>
+            </div>
+            <div className="p-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {myCondos.map(condo => (
+                <button 
+                  key={condo.firestoreId}
+                  onClick={() => onSelect(condo.firestoreId)}
+                  className="p-6 bg-slate-50 hover:bg-blue-50 border border-slate-100 hover:border-blue-200 rounded-2xl text-left transition-all group"
+                >
+                  <Home className="w-8 h-8 text-blue-600 mb-3 group-hover:scale-110 transition-transform" />
+                  <h3 className="font-bold text-slate-800">{condo.name}</h3>
+                  <p className="text-sm text-slate-500 mt-1 line-clamp-1">{condo.address}</p>
+                </button>
+              ))}
+              {myCondos.length === 0 && (
+                <div className="col-span-full py-12 text-center text-slate-400">
+                  <AlertCircle className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                  <p>{t('noCondos')}</p>
+                </div>
+              )}
+            </div>
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-center">
+               <button onClick={() => signOut(auth)} className="text-red-600 font-semibold px-4 py-2 hover:bg-red-50 rounded-xl transition-colors flex items-center gap-2">
+                 <LogOut className="w-4 h-4" /> {t('logout')}
+               </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function CondosPage({ allCondos, db, t }) {
+      const [showForm, setShowForm] = useState(false);
+      const [editingCondo, setEditingCondo] = useState(null);
+      const [name, setName] = useState('');
+      const [address, setAddress] = useState('');
+      const [nif, setNif] = useState('');
+      const [iban, setIban] = useState('');
+      const [loading, setLoading] = useState(false);
+
+      useEffect(() => {
+        if (editingCondo) {
+          setName(editingCondo.name || '');
+          setAddress(editingCondo.address || '');
+          setNif(editingCondo.nif || '');
+          setIban(editingCondo.iban || '');
+          setShowForm(true);
+        } else {
+          setName(''); setAddress(''); setNif(''); setIban('');
+        }
+      }, [editingCondo]);
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        const condoData = { name, address, nif, iban };
+        try {
+          if (editingCondo) {
+            await updateDoc(doc(db, 'condos', editingCondo.firestoreId), condoData);
+          } else {
+            await addDoc(collection(db, 'condos'), condoData);
+          }
+          setShowForm(false);
+          setEditingCondo(null);
+        } catch (err) {
+          alert('Erro: ' + err.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const handleDelete = async (condoId) => {
+        if (!confirm(t('confirmDeleteCondo'))) return;
+        try {
+          await deleteDoc(doc(db, 'condos', condoId));
+        } catch (err) {
+          alert('Erro ao eliminar: ' + err.message);
+        }
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center pt-2">
+            <div>
+              <h2 className="text-[26px] font-bold text-slate-800 tracking-tight">{t('condos')}</h2>
+              <p className="text-slate-500 text-sm mt-1">Gestão global de condomínios no sistema</p>
+            </div>
+            <button onClick={() => { setShowForm(!showForm); setEditingCondo(null); }} className="flex items-center gap-2 bg-blue-600 text-white px-5 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20">
+              {showForm ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />} {showForm ? 'Cancelar' : t('createCondo')}
+            </button>
+          </div>
+
+          {showForm && (
+            <form onSubmit={handleSubmit} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
+              <h3 className="font-bold text-lg text-slate-800">{editingCondo ? t('editCondo') : t('createCondo')}</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-500 ml-1 uppercase">{t('condoName')}</label>
+                  <input required value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3 border border-slate-200 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-500 ml-1 uppercase">{t('condoAddress')}</label>
+                  <input required value={address} onChange={e => setAddress(e.target.value)} className="w-full px-4 py-3 border border-slate-200 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-500 ml-1 uppercase">{t('condoNif')}</label>
+                  <input required value={nif} onChange={e => setNif(e.target.value)} className="w-full px-4 py-3 border border-slate-200 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-500 ml-1 uppercase">{t('condoIban')}</label>
+                  <input required value={iban} onChange={e => setIban(e.target.value)} className="w-full px-4 py-3 border border-slate-200 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setShowForm(false)} className="px-6 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl">Cancelar</button>
+                <button type="submit" disabled={loading} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold disabled:opacity-50">
+                  {loading ? 'A processar...' : t('save')}
+                </button>
+              </div>
+            </form>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {allCondos.map(c => (
+              <div key={c.firestoreId} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between group">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center gap-4">
+                    <div className="bg-blue-50 p-3 rounded-2xl text-blue-600">
+                      <Home className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-lg text-slate-800">{c.name}</h3>
+                      <p className="text-slate-500 text-sm mt-0.5 line-clamp-1">{c.address}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => setEditingCondo(c)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><Edit2 className="w-4 h-4" /></button>
+                    <button onClick={() => handleDelete(c.firestoreId)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                </div>
+                <div className="pt-4 border-t border-slate-50 flex justify-between items-center text-xs text-slate-400 font-medium">
+                  <span>NIF: {c.nif}</span>
+                  <span className="truncate ml-4">IBAN: {c.iban}</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       );
     }
@@ -667,7 +941,7 @@
       );
     }
 
-    function DocumentsPage({ documents, docTypes, isAdmin, currentUser, db, appId, storage }) {
+    function DocumentsPage({ documents, docTypes, isAdmin, currentUser, db, appId, storage, selectedCondoId }) {
       const [showForm, setShowForm] = useState(false);
       const [showTypeForm, setShowTypeForm] = useState(false);
       const [newTypeName, setNewTypeName] = useState('');
@@ -696,7 +970,7 @@
           if (file) {
             const timestamp = Date.now();
             fileName = `${timestamp}_${file.name}`;
-            const fileRef = ref(storage, `artifacts/${appId}/public/documents/${fileName}`);
+            const fileRef = ref(storage, `condos/${selectedCondoId}/documents/${fileName}`);
             await uploadBytes(fileRef, file);
             fileUrl = await getDownloadURL(fileRef);
           }
@@ -711,9 +985,9 @@
           };
 
           if (editingDoc) {
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'documents', editingDoc.firestoreId), docData);
+            await updateDoc(doc(db, 'condos', selectedCondoId, 'documents', editingDoc.firestoreId), docData);
           } else {
-            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'documents'), docData);
+            await addDoc(collection(db, 'condos', selectedCondoId, 'documents'), docData);
           }
 
           setShowForm(false);
@@ -733,7 +1007,7 @@
         if (!newTypeName.trim()) return;
         setLoading(true);
         try {
-          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'docTypes'), {
+          await addDoc(collection(db, 'condos', selectedCondoId, 'docTypes'), {
             name: newTypeName.trim(),
             createdAt: new Date().toISOString()
           });
@@ -752,7 +1026,7 @@
         if (!confirm('Tem a certeza que deseja eliminar este tipo de documento?')) return;
         
         try {
-          await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'docTypes', typeId));
+          await deleteDoc(doc(db, 'condos', selectedCondoId, 'docTypes', typeId));
         } catch (err) {
           alert('Erro ao eliminar tipo: ' + err.message);
         }
@@ -761,7 +1035,7 @@
       const handleDeleteDoc = async (docId) => {
         if (!confirm('Tem a certeza que deseja eliminar este documento?')) return;
         try {
-          await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'documents', docId));
+          await deleteDoc(doc(db, 'condos', selectedCondoId, 'documents', docId));
         } catch (err) {
           alert('Erro ao eliminar documento: ' + err.message);
         }
@@ -924,7 +1198,7 @@
       );
     }
 
-    function CondoPage({ condo, isAdmin, db, appId, users, t }) {
+    function CondoPage({ condo, isAdmin, db, appId, users, t, selectedCondoId }) {
       const [isEditing, setIsEditing] = useState(!condo);
       const [formData, setFormData] = useState(condo || { name: '', address: '', nif: '', iban: '' });
       const [saving, setSaving] = useState(false);
@@ -944,7 +1218,7 @@
         e.preventDefault();
         setSaving(true);
         try {
-          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'condo', 'info'), formData);
+          await updateDoc(doc(db, 'condos', selectedCondoId), formData);
           setIsEditing(false);
         } catch (err) {
           alert('Erro ao guardar: ' + err.message);
@@ -1069,7 +1343,7 @@
       );
     }
 
-    function ExpensesPage({ expenses, isAdmin, currentUser, db, appId }) {
+    function ExpensesPage({ expenses, isAdmin, currentUser, db, appId, selectedCondoId }) {
       const [showForm, setShowForm] = useState(false);
       const [editingExpense, setEditingExpense] = useState(null);
       const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -1104,9 +1378,9 @@
 
         try {
           if (editingExpense) {
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expenses', editingExpense.firestoreId), expenseData);
+            await updateDoc(doc(db, 'condos', selectedCondoId, 'expenses', editingExpense.firestoreId), expenseData);
           } else {
-            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'expenses'), expenseData);
+            await addDoc(collection(db, 'condos', selectedCondoId, 'expenses'), expenseData);
           }
           setShowForm(false);
           setEditingExpense(null);
@@ -1120,7 +1394,7 @@
       const handleDelete = async (id) => {
         if (!confirm('Tem a certeza que deseja eliminar esta despesa?')) return;
         try {
-          await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expenses', id));
+          await deleteDoc(doc(db, 'condos', selectedCondoId, 'expenses', id));
         } catch (err) {
           alert('Erro ao eliminar: ' + err.message);
         }
@@ -1267,7 +1541,7 @@
       );
     }
 
-    function BudgetsPage({ budgets, isAdmin, db, appId }) {
+    function BudgetsPage({ budgets, isAdmin, db, appId, selectedCondoId }) {
       const [showForm, setShowForm] = useState(false);
       const [editingBudget, setEditingBudget] = useState(null);
       const [startDate, setStartDate] = useState('');
@@ -1328,9 +1602,9 @@
 
         try {
           if (editingBudget) {
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'budgets', editingBudget.firestoreId), budgetData);
+            await updateDoc(doc(db, 'condos', selectedCondoId, 'budgets', editingBudget.firestoreId), budgetData);
           } else {
-            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'budgets'), budgetData);
+            await addDoc(collection(db, 'condos', selectedCondoId, 'budgets'), budgetData);
           }
           setShowForm(false);
           setEditingBudget(null);
@@ -1344,7 +1618,7 @@
       const handleDelete = async (id) => {
         if (!confirm('Tem a certeza que deseja eliminar este orçamento?')) return;
         try {
-          await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'budgets', id));
+          await deleteDoc(doc(db, 'condos', selectedCondoId, 'budgets', id));
         } catch (err) {
           alert('Erro ao eliminar: ' + err.message);
         }
@@ -1495,7 +1769,7 @@
       );
     }
 
-    function FractionsPage({ users, quotas, isAdmin, db, appId, budgets, currentUser, t }) {
+    function FractionsPage({ users, quotas, isAdmin, db, appId, budgets, currentUser, t, selectedCondoId }) {
       const [showForm, setShowForm] = useState(false);
       const [editingUser, setEditingUser] = useState(null);
       const [newName, setNewName] = useState('');
@@ -1549,18 +1823,19 @@
         if (!confirm(t('promoteConfirm', { name: user.name }))) return;
         setLoading(true);
         try {
-          // 1. Promover o novo utilizador
-          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', user.firestoreId), {
+          // 1. Promover o novo utilizador no condomínio
+          await updateDoc(doc(db, 'condos', selectedCondoId, 'users', user.firestoreId), {
             role: 'admin'
           });
-          // 2. Despromover o administrador atual
-          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', currentUser.firestoreId), {
+          // 2. Despromover o administrador atual no condomínio
+          await updateDoc(doc(db, 'condos', selectedCondoId, 'users', currentUser.firestoreId), {
             role: 'user'
           });
-          // 3. Terminar sessão
-          await signOut(auth);
+          // Nota: O papel global na coleção 'users' pode precisar de ajuste se for o único admin de todos os seus condos
+          alert('Papéis atualizados no condomínio.');
         } catch (err) {
           alert('Erro ao promover administrador: ' + err.message);
+        } finally {
           setLoading(false);
         }
       };
@@ -1570,7 +1845,7 @@
         setLoading(true); setMsg({ type: '', text: '' });
         try {
           if (editingUser) {
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', editingUser.firestoreId), {
+            await updateDoc(doc(db, 'condos', selectedCondoId, 'users', editingUser.firestoreId), {
               name: newName,
               fraction: newFraction,
               permilagem: parseFloat(newPermilagem) || 0,
@@ -1585,7 +1860,7 @@
             const tempPassword = Math.random().toString(36).slice(-10) + "A1!";
             const userCred = await createUserWithEmailAndPassword(secondaryAuth, newEmail, tempPassword);
 
-            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userCred.user.uid), {
+            const newUser = {
               id: userCred.user.uid, 
               name: newName, 
               email: newEmail, 
@@ -1594,8 +1869,21 @@
               phone: newPhone,
               nif: parseInt(newNif) || null,
               role: 'user', 
-              condoId: appId
-            });
+              condoId: selectedCondoId
+            };
+
+            // 1. Guardar no condomínio
+            await setDoc(doc(db, 'condos', selectedCondoId, 'users', userCred.user.uid), newUser);
+            
+            // 2. Criar/Atualizar perfil global
+            const globalUserRef = doc(db, 'users', userCred.user.uid);
+            await setDoc(globalUserRef, {
+              name: newName,
+              email: newEmail,
+              role: 'user',
+              condoIds: [selectedCondoId]
+            }, { merge: true });
+
             await sendPasswordResetEmail(auth, newEmail);
             await signOut(secondaryAuth);
             
@@ -1611,11 +1899,11 @@
       };
 
       const handleDeleteUser = async (user) => {
-        if (!confirm(`Tem a certeza que deseja eliminar o utilizador ${user.name}? Esta ação não pode ser desfeita na base de dados.`)) return;
+        if (!confirm(`Tem a certeza que deseja eliminar o utilizador ${user.name} deste condomínio?`)) return;
         
         try {
-          await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', user.firestoreId));
-          alert('Utilizador eliminado com sucesso.');
+          await deleteDoc(doc(db, 'condos', selectedCondoId, 'users', user.firestoreId));
+          alert('Utilizador eliminado do condomínio com sucesso.');
         } catch (err) {
           alert('Erro ao eliminar: ' + err.message);
         }
@@ -1732,7 +2020,7 @@
       );
     }
 
-    function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo, t }) {
+    function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo, t, selectedCondoId }) {
       const sortedBudgets = [...budgets].sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
       const currentBudget = sortedBudgets[0];
 
@@ -1779,7 +2067,7 @@
         }
 
         try {
-          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quotas', quotaId), {
+          await setDoc(doc(db, 'condos', selectedCondoId, 'quotas', quotaId), {
             userId,
             monthKey,
             status: 'paid',
@@ -1911,7 +2199,7 @@
 
               const mailData = {
                 to: user.email,
-                appId: appId,
+                condoId: selectedCondoId,
                 message: {
                   subject: `Recibo de Pagamento - Quota ${monthName} ${year} - ${user.fraction}`,
                   html: `
@@ -2031,7 +2319,7 @@
         e.preventDefault();
         setSaving(true); setMessage({ type: '', text: '' });
         try {
-          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', currentUser.firestoreId), { 
+          await updateDoc(doc(db, 'users', currentUser.firestoreId), { 
             name,
             phone,
             nif: parseInt(nif) || null,
