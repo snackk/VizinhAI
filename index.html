@@ -51,7 +51,7 @@
       AlertCircle, CheckCircle, Plus, FileText, Wallet, 
       TrendingUp, Clock, ShieldAlert, FolderOpen, UploadCloud, 
       Download, Settings, Save, Lock, User, Edit2, Trash2,
-      ChevronDown, ChevronUp, Calendar
+      ChevronDown, ChevronUp, Calendar, Mail, Search, Filter
     } from 'https://esm.sh/lucide-react@0.292.0';
 
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
@@ -140,7 +140,18 @@
         sendResetLink: "Enviar link de recuperação",
         backToLogin: "Voltar ao login",
         resetSent: "Link de recuperação enviado para o seu e-mail!",
-        errorReset: "Erro ao enviar e-mail de recuperação. Verifique o endereço."
+        errorReset: "Erro ao enviar e-mail de recuperação. Verifique o endereço.",
+        mails: "E-mails",
+        mailTo: "Para",
+        mailSubject: "Assunto",
+        mailStatus: "Estado",
+        mailAttachment: "Anexo",
+        mailSearchPlaceholder: "Pesquisar por nome de anexo...",
+        mailFilterError: "Apenas Erros",
+        mailAll: "Todos",
+        mailSuccess: "Sucesso",
+        mailError: "Erro",
+        mailNoMails: "Nenhum e-mail encontrado."
       },
       en: {
         dashboard: "Dashboard",
@@ -204,7 +215,18 @@
         sendResetLink: "Send reset link",
         backToLogin: "Back to login",
         resetSent: "Reset link sent to your email!",
-        errorReset: "Error sending reset email. Please check the address."
+        errorReset: "Error sending reset email. Please check the address.",
+        mails: "Emails",
+        mailTo: "To",
+        mailSubject: "Subject",
+        mailStatus: "Status",
+        mailAttachment: "Attachment",
+        mailSearchPlaceholder: "Search by attachment name...",
+        mailFilterError: "Only Errors",
+        mailAll: "All",
+        mailSuccess: "Success",
+        mailError: "Error",
+        mailNoMails: "No emails found."
       },
       fr: {
         dashboard: "Tableau de bord",
@@ -265,10 +287,21 @@
         switchCondo: "Changer de copropriété",
         forgotPassword: "Mot de passe oublié ?",
         resetPassword: "Réinitialiser le mot de passe",
-        sendResetLink: "Envoyer le lien de récupération",
+        sendResetLink: "Envoyer le lien de recuperação",
         backToLogin: "Retour à la connexion",
         resetSent: "Lien de récupération envoyé à votre adresse e-mail !",
-        errorReset: "Erreur lors de l'envoi de l'e-mail de récupération. Veuillez vérifier l'adresse."
+        errorReset: "Erreur lors de l'envoi de l'e-mail de recuperação. Veuillez vérifier l'adresse.",
+        mails: "E-mails",
+        mailTo: "À",
+        mailSubject: "Objet",
+        mailStatus: "État",
+        mailAttachment: "Pièce jointe",
+        mailSearchPlaceholder: "Rechercher par nom de pièce jointe...",
+        mailFilterError: "Erreurs uniquement",
+        mailAll: "Tous",
+        mailSuccess: "Succès",
+        mailError: "Erreur",
+        mailNoMails: "Aucun e-mail trouvé."
       }
     };
 
@@ -452,6 +485,7 @@
           case 'conta-corrente': return isAdmin ? <CurrentAccountPage budgets={budgets} users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} condo={condo} t={t} selectedCondoId={effectiveCondoId} /> : null;
           case 'fracoes': return <FractionsPage users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} budgets={budgets} currentUser={currentUser} t={t} selectedCondoId={effectiveCondoId} />;
           case 'definicoes': return <SettingsPage currentUser={currentUser} db={db} appId={appId} t={t} selectedCondoId={selectedCondoId} />;
+          case 'mails': return (isAdmin || isBackoffice) ? <MailsPage db={db} t={t} /> : null;
           case 'condos': return isBackoffice ? <CondosPage allCondos={allCondos} db={db} t={t} onFirstCreate={() => setSelectedCondoId(null)} /> : null;
           default: return <AdminDashboard />;
         }
@@ -492,6 +526,7 @@
                   <NavItem icon={<Wallet />} label={t('budgets')} active={activeTab === 'orcamentos'} onClick={() => { setActiveTab('orcamentos'); setIsMobileMenuOpen(false); }} />
                   {isAdmin && <NavItem icon={<TrendingUp />} label={t('currentAccount')} active={activeTab === 'conta-corrente'} onClick={() => { setActiveTab('conta-corrente'); setIsMobileMenuOpen(false); }} />}
                   <NavItem icon={<Users />} label={t('fractions')} active={activeTab === 'fracoes'} onClick={() => { setActiveTab('fracoes'); setIsMobileMenuOpen(false); }} />
+                  {isAdmin && <NavItem icon={<Mail />} label={t('mails')} active={activeTab === 'mails'} onClick={() => { setActiveTab('mails'); setIsMobileMenuOpen(false); }} />}
                 </>
               )}
             </nav>
@@ -852,6 +887,136 @@
           {React.cloneElement(icon, { className: `w-[22px] h-[22px] ${active ? 'text-blue-600' : 'text-slate-400'}` })}
           {label}
         </button>
+      );
+    }
+
+    function MailsPage({ db, t }) {
+      const [mails, setMails] = useState([]);
+      const [search, setSearch] = useState('');
+      const [filterError, setFilterError] = useState(false);
+      const [loading, setLoading] = useState(true);
+
+      useEffect(() => {
+        const unsub = onSnapshot(collection(db, 'mail'), (snap) => {
+          setMails(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() })).sort((a, b) => {
+            const dateA = a.delivery?.endTime?.toDate?.() || new Date(0);
+            const dateB = b.delivery?.endTime?.toDate?.() || new Date(0);
+            return dateB - dateA;
+          }));
+          setLoading(false);
+        }, (err) => {
+          console.error("Erro ao listar e-mails:", err);
+          setLoading(false);
+        });
+        return () => unsub();
+      }, []);
+
+      const filteredMails = mails.filter(m => {
+        const matchesSearch = search === '' || m.message?.attachments?.some(a => a.filename.toLowerCase().includes(search.toLowerCase()));
+        const matchesFilter = !filterError || (m.delivery?.state && m.delivery.state !== 'SUCCESS');
+        return matchesSearch && matchesFilter;
+      });
+
+      const downloadAttachment = (attachment) => {
+        const link = document.createElement('a');
+        link.href = `data:application/pdf;base64,${attachment.content}`;
+        link.download = attachment.filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
+
+      const getStatusBadge = (state) => {
+        switch (state) {
+          case 'SUCCESS':
+            return <span className="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">{t('mailSuccess')}</span>;
+          case 'ERROR':
+            return <span className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">{t('mailError')}</span>;
+          case 'PROCESSING':
+            return <span className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">Enviando</span>;
+          default:
+            return <span className="bg-slate-100 text-slate-500 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">{state || 'Pendente'}</span>;
+        }
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="pt-2">
+            <h2 className="text-[26px] font-bold text-slate-800 tracking-tight">{t('mails')}</h2>
+            <p className="text-slate-500 text-sm mt-1">Histórico de comunicações enviadas pelo sistema</p>
+          </div>
+
+          <div className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-col md:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder={t('mailSearchPlaceholder')} 
+                value={search} 
+                onChange={e => setSearch(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 border border-slate-200 bg-slate-50 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+              />
+            </div>
+            <button 
+              onClick={() => setFilterError(!filterError)}
+              className={`flex items-center justify-center gap-2 px-6 py-3 rounded-2xl font-semibold transition-all border ${filterError ? 'bg-red-50 border-red-200 text-red-700' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}`}
+            >
+              <Filter className="w-5 h-5" />
+              {t('mailFilterError')}
+            </button>
+          </div>
+
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 text-slate-500 border-b border-slate-100">
+                    <th className="px-6 py-4 font-semibold">{t('mailTo')}</th>
+                    <th className="px-6 py-4 font-semibold">{t('mailSubject')}</th>
+                    <th className="px-6 py-4 font-semibold text-center">{t('mailStatus')}</th>
+                    <th className="px-6 py-4 font-semibold">{t('mailAttachment')}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {filteredMails.length > 0 ? filteredMails.map((mail) => (
+                    <tr key={mail.firestoreId} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-6 py-4">
+                        <p className="font-bold text-slate-900">{mail.to}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-slate-600 line-clamp-1">{mail.message?.subject}</p>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        {getStatusBadge(mail.delivery?.state)}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col gap-1">
+                          {mail.message?.attachments?.map((att, idx) => (
+                            <button 
+                              key={idx}
+                              onClick={() => downloadAttachment(att)}
+                              className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium group"
+                            >
+                              <FileText className="w-4 h-4 text-blue-400 group-hover:text-blue-600" />
+                              <span className="truncate max-w-[150px]">{att.filename}</span>
+                              <Download className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </button>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan="4" className="px-6 py-12 text-center text-slate-500 font-medium">
+                        {loading ? 'A carregar e-mails...' : t('mailNoMails')}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       );
     }
 
