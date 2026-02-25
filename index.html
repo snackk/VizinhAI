@@ -1954,12 +1954,26 @@
         if (!confirm(t('promoteConfirm', { name: user.name }))) return;
         setLoading(true);
         try {
-          // 1. Promover o novo utilizador no condomínio
+          // 1. Procurar se já existe um administrador neste condomínio
+          const existingAdmin = users.find(u => u.role === 'admin' && u.firestoreId !== user.firestoreId);
+          
+          if (existingAdmin) {
+            // Despromover o administrador atual no condomínio
+            await updateDoc(doc(db, 'condos', selectedCondoId, 'users', existingAdmin.firestoreId), {
+              role: 'user'
+            });
+            // Despromover o papel global (se ele não for admin de outros condomínios - simplificado para 'user' conforme requisito)
+            await updateDoc(doc(db, 'users', existingAdmin.firestoreId), {
+              role: 'user'
+            });
+          }
+
+          // 2. Promover o novo utilizador no condomínio
           await updateDoc(doc(db, 'condos', selectedCondoId, 'users', user.firestoreId), {
             role: 'admin'
           });
           
-          // 2. Atualizar o papel global (necessário para acesso correto a outros condomínios/visão global)
+          // 3. Atualizar o papel global
           await updateDoc(doc(db, 'users', user.firestoreId), {
             role: 'admin'
           });
