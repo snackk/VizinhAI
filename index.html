@@ -613,7 +613,7 @@
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <StatCard title={t('collectedFund')} value={`${collectedAmount.toFixed(2)} €`} subtitle={t('budgetedOf', { amount: totalExpected.toFixed(2) })} icon={<TrendingUp className="w-6 h-6 text-green-600" />} color="green" />
             <StatCard title={t('overdueQuotas')} value={`${totalDebt.toFixed(2)} €`} subtitle={t('toReceive')} icon={<AlertCircle className="w-6 h-6 text-orange-600" />} color="orange" />
-            <!--<StatCard title={t('pendingExpenses')} value={`${pendingExpensesAmount.toFixed(2)} €`} subtitle={t('waitingApproval')} icon={<Clock className="w-6 h-6 text-blue-600" />} color="blue" />-->
+            {/*<StatCard title={t('pendingExpenses')} value={`${pendingExpensesAmount.toFixed(2)} €`} subtitle={t('waitingApproval')} icon={<Clock className="w-6 h-6 text-blue-600" />} color="blue" />*/}
           </div>
           <AnnualQuotasTable currentBudget={currentBudget} users={users} />
         </div>
