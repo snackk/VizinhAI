@@ -1767,8 +1767,9 @@
               const today = dateObj.toLocaleDateString('pt-PT');
               const condoName = condo?.name || 'Condomínio';
 
-              await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'mail'), {
+              await addDoc(collection(db, 'mail'), {
                 to: user.email,
+                appId: appId,
                 message: {
                   subject: `Recibo de Pagamento - Quota ${monthName} ${year} - ${user.fraction}`,
                   html: `
