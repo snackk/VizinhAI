@@ -261,6 +261,15 @@
       const [selectedCondoId, setSelectedCondoId] = useState(null);
       const [allCondos, setAllCondos] = useState([]);
       const [activeTab, setActiveTab] = useState('dashboard');
+
+      const handleCondoSelect = (id) => {
+        if (id === 'new') {
+          setActiveTab('condos');
+          setSelectedCondoId('temp-new'); // Valor temporário para sair do ecrã de seleção
+        } else {
+          setSelectedCondoId(id);
+        }
+      };
       const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
       const [lang, setLang] = useState('pt');
 
@@ -337,12 +346,23 @@
       }, []);
 
       useEffect(() => {
-        if (!firebaseUser) return;
+        if (!firebaseUser || !currentUser) {
+          setAllCondos([]);
+          return;
+        }
+
+        // Apenas utilizadores com múltiplos condomínios ou Backoffice precisam de listar todos os condomínios
+        if (currentUser.role !== 'backoffice' && (!currentUser.condoIds || currentUser.condoIds.length <= 1)) {
+          return;
+        }
+
         const unsubCondos = onSnapshot(collection(db, 'condos'), (snap) => {
           setAllCondos(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() })));
+        }, (err) => {
+          console.error("Erro ao listar condomínios:", err);
         });
         return () => unsubCondos();
-      }, [firebaseUser]);
+      }, [firebaseUser, currentUser]);
 
       useEffect(() => {
         if (!firebaseUser || !selectedCondoId) {
@@ -352,17 +372,17 @@
 
         const getCol = (colName) => collection(db, 'condos', selectedCondoId, colName);
 
-        const unsubUsers = onSnapshot(getCol('users'), (snap) => setUsers(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))));
-        const unsubQuotas = onSnapshot(getCol('quotas'), (snap) => setQuotas(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))));
-        const unsubExpenses = onSnapshot(getCol('expenses'), (snap) => setExpenses(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))));
-        const unsubBudgets = onSnapshot(getCol('budgets'), (snap) => setBudgets(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))));
-        const unsubDocs = onSnapshot(getCol('documents'), (snap) => setDocuments(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))));
-        const unsubDocTypes = onSnapshot(getCol('docTypes'), (snap) => setDocTypes(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))));
+        const unsubUsers = onSnapshot(getCol('users'), (snap) => setUsers(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))), (err) => console.error("Erro users:", err));
+        const unsubQuotas = onSnapshot(getCol('quotas'), (snap) => setQuotas(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))), (err) => console.error("Erro quotas:", err));
+        const unsubExpenses = onSnapshot(getCol('expenses'), (snap) => setExpenses(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))), (err) => console.error("Erro expenses:", err));
+        const unsubBudgets = onSnapshot(getCol('budgets'), (snap) => setBudgets(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))), (err) => console.error("Erro budgets:", err));
+        const unsubDocs = onSnapshot(getCol('documents'), (snap) => setDocuments(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))), (err) => console.error("Erro docs:", err));
+        const unsubDocTypes = onSnapshot(getCol('docTypes'), (snap) => setDocTypes(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))), (err) => console.error("Erro docTypes:", err));
         const unsubCondo = onSnapshot(doc(db, 'condos', selectedCondoId), (docSnap) => {
           if (docSnap.exists()) {
             setCondo({ firestoreId: docSnap.id, ...docSnap.data() });
           }
-        });
+        }, (err) => console.error("Erro condo:", err));
 
         return () => { unsubUsers(); unsubQuotas(); unsubExpenses(); unsubBudgets(); unsubDocs(); unsubDocTypes(); unsubCondo(); };
       }, [firebaseUser, selectedCondoId]);
@@ -400,14 +420,14 @@
 
         switch (activeTab) {
           case 'dashboard': return isAdmin ? <AdminDashboard expenses={expenses} quotas={quotas} users={users} budgets={budgets} t={t} /> : <UserDashboard user={currentUser} quotas={quotas} expenses={expenses} budgets={budgets} users={users} t={t} />;
-          case 'condo': return <CondoPage condo={condo} isAdmin={isAdmin} db={db} appId={appId} users={users} t={t} selectedCondoId={selectedCondoId} />;
-          case 'documentos': return <DocumentsPage documents={documents} docTypes={docTypes} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} storage={storage} selectedCondoId={selectedCondoId} />;
-          case 'despesas': return <ExpensesPage expenses={expenses} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} selectedCondoId={selectedCondoId} />;
-          case 'orcamentos': return <BudgetsPage budgets={budgets} isAdmin={isAdmin} db={db} appId={appId} selectedCondoId={selectedCondoId} />;
-          case 'conta-corrente': return isAdmin ? <CurrentAccountPage budgets={budgets} users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} condo={condo} t={t} selectedCondoId={selectedCondoId} /> : null;
-          case 'fracoes': return <FractionsPage users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} budgets={budgets} currentUser={currentUser} t={t} selectedCondoId={selectedCondoId} />;
+          case 'condo': return <CondoPage condo={condo} isAdmin={isAdmin} db={db} appId={appId} users={users} t={t} selectedCondoId={effectiveCondoId} />;
+          case 'documentos': return <DocumentsPage documents={documents} docTypes={docTypes} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} storage={storage} selectedCondoId={effectiveCondoId} />;
+          case 'despesas': return <ExpensesPage expenses={expenses} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} selectedCondoId={effectiveCondoId} />;
+          case 'orcamentos': return <BudgetsPage budgets={budgets} isAdmin={isAdmin} db={db} appId={appId} selectedCondoId={effectiveCondoId} />;
+          case 'conta-corrente': return isAdmin ? <CurrentAccountPage budgets={budgets} users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} condo={condo} t={t} selectedCondoId={effectiveCondoId} /> : null;
+          case 'fracoes': return <FractionsPage users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} budgets={budgets} currentUser={currentUser} t={t} selectedCondoId={effectiveCondoId} />;
           case 'definicoes': return <SettingsPage currentUser={currentUser} db={db} appId={appId} t={t} />;
-          case 'condos': return isBackoffice ? <CondosPage allCondos={allCondos} db={db} t={t} /> : null;
+          case 'condos': return isBackoffice ? <CondosPage allCondos={allCondos} db={db} t={t} onFirstCreate={() => setSelectedCondoId(null)} /> : null;
           default: return <AdminDashboard />;
         }
       };
@@ -416,8 +436,10 @@
       if (!firebaseUser || !currentUser) return <LoginScreen />;
 
       if (!selectedCondoId && currentUser.condoIds?.length > 1 || (!selectedCondoId && isBackoffice && activeTab !== 'condos')) {
-        return <CondoSelectionScreen currentUser={currentUser} allCondos={allCondos} onSelect={setSelectedCondoId} t={t} />;
+        return <CondoSelectionScreen currentUser={currentUser} allCondos={allCondos} onSelect={handleCondoSelect} t={t} />;
       }
+
+      const effectiveCondoId = selectedCondoId === 'temp-new' ? null : selectedCondoId;
 
       const userRoleLabel = isBackoffice ? t('backoffice') : (isAdmin ? 'Admin' : 'Condómino');
 
@@ -494,7 +516,8 @@
     }
 
     function CondoSelectionScreen({ currentUser, allCondos, onSelect, t }) {
-      const myCondos = allCondos.filter(c => currentUser.role === 'backoffice' || currentUser.condoIds?.includes(c.firestoreId));
+      const isBackoffice = currentUser.role === 'backoffice';
+      const myCondos = allCondos.filter(c => isBackoffice || currentUser.condoIds?.includes(c.firestoreId));
 
       return (
         <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4 safe-pt safe-pb">
@@ -516,9 +539,19 @@
                 </button>
               ))}
               {myCondos.length === 0 && (
-                <div className="col-span-full py-12 text-center text-slate-400">
-                  <AlertCircle className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                  <p>{t('noCondos')}</p>
+                <div className="col-span-full py-12 text-center">
+                  <div className="bg-slate-50 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <Home className="w-8 h-8 text-slate-300" />
+                  </div>
+                  <p className="text-slate-500 font-medium mb-6">{t('noCondos')}</p>
+                  {isBackoffice && (
+                    <button 
+                      onClick={() => onSelect('new')} 
+                      className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 active:scale-95"
+                    >
+                      <Plus className="w-5 h-5" /> {t('createCondo')}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -532,7 +565,7 @@
       );
     }
 
-    function CondosPage({ allCondos, db, t }) {
+    function CondosPage({ allCondos, db, t, onFirstCreate }) {
       const [showForm, setShowForm] = useState(false);
       const [editingCondo, setEditingCondo] = useState(null);
       const [name, setName] = useState('');
@@ -540,6 +573,12 @@
       const [nif, setNif] = useState('');
       const [iban, setIban] = useState('');
       const [loading, setLoading] = useState(false);
+
+      useEffect(() => {
+        if (allCondos.length === 0 && !showForm) {
+          setShowForm(true);
+        }
+      }, [allCondos]);
 
       useEffect(() => {
         if (editingCondo) {
@@ -561,7 +600,10 @@
           if (editingCondo) {
             await updateDoc(doc(db, 'condos', editingCondo.firestoreId), condoData);
           } else {
-            await addDoc(collection(db, 'condos'), condoData);
+            const docRef = await addDoc(collection(db, 'condos'), condoData);
+            if (allCondos.length === 0 && onFirstCreate) {
+              onFirstCreate(docRef.id);
+            }
           }
           setShowForm(false);
           setEditingCondo(null);
@@ -648,6 +690,21 @@
               </div>
             ))}
           </div>
+
+          {allCondos.length === 0 && !showForm && (
+            <div className="p-16 text-center bg-white rounded-3xl border border-dashed border-slate-200">
+              <div className="bg-slate-50 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Home className="w-8 h-8 text-slate-300" />
+              </div>
+              <p className="text-slate-500 font-medium mb-6">Não existem condomínios registados no sistema.</p>
+              <button 
+                onClick={() => setShowForm(true)} 
+                className="inline-flex items-center gap-2 bg-blue-600 text-white px-8 py-4 rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 active:scale-95"
+              >
+                <Plus className="w-6 h-6" /> {t('createCondo')}
+              </button>
+            </div>
+          )}
         </div>
       );
     }
