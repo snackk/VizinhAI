@@ -76,12 +76,117 @@
     const storage = getStorage(app);
     const appId = window.__app_id || 'default-app-id';
 
+    const translations = {
+      pt: {
+        dashboard: "Dashboard",
+        condo: "Condomínio",
+        documents: "Documentos",
+        expenses: "Despesas",
+        budgets: "Orçamentos",
+        currentAccount: "Conta Corrente",
+        fractions: "Frações",
+        settings: "Definições",
+        summary: "Resumo",
+        logout: "Sair da Conta",
+        save: "Guardar Alterações",
+        saving: "A guardar...",
+        profileSaved: "Perfil guardado!",
+        errorSaving: "Erro ao guardar.",
+        nameLabel: "O seu nome",
+        languageLabel: "Língua Preferencial",
+        globalVision: "Visão global do condomínio",
+        collectedFund: "Fundo Recebido",
+        overdueQuotas: "Quotas em Atraso",
+        pendingExpenses: "Despesas Pendentes",
+        budgetedOf: "De {amount} € orçamentados",
+        toReceive: "Valor por receber",
+        waitingApproval: "A aguardar aprovação",
+        hello: "Olá, {name}",
+        unitSummary: "Resumo da sua fração ({unit})",
+        amountToPay: "Valor a Pagar",
+        regularSituation: "Situação Regular"
+      },
+      en: {
+        dashboard: "Dashboard",
+        condo: "Condo",
+        documents: "Documents",
+        expenses: "Expenses",
+        budgets: "Budgets",
+        currentAccount: "Current Account",
+        fractions: "Units",
+        settings: "Settings",
+        summary: "Summary",
+        logout: "Logout",
+        save: "Save Changes",
+        saving: "Saving...",
+        profileSaved: "Profile saved!",
+        errorSaving: "Error saving.",
+        nameLabel: "Your name",
+        languageLabel: "Preferred Language",
+        globalVision: "Global condo overview",
+        collectedFund: "Collected Fund",
+        overdueQuotas: "Overdue Quotas",
+        pendingExpenses: "Pending Expenses",
+        budgetedOf: "From {amount} € budgeted",
+        toReceive: "Amount to receive",
+        waitingApproval: "Waiting for approval",
+        hello: "Hello, {name}",
+        unitSummary: "Unit summary ({unit})",
+        amountToPay: "Amount to Pay",
+        regularSituation: "Regular Situation"
+      },
+      fr: {
+        dashboard: "Tableau de bord",
+        condo: "Copropriété",
+        documents: "Documents",
+        expenses: "Dépenses",
+        budgets: "Budgets",
+        currentAccount: "Compte Courant",
+        fractions: "Unités",
+        settings: "Paramètres",
+        summary: "Résumé",
+        logout: "Déconnexion",
+        save: "Enregistrer les modifications",
+        saving: "Enregistrement...",
+        profileSaved: "Profil enregistré !",
+        errorSaving: "Erreur lors de l'enregistrement.",
+        nameLabel: "Votre nom",
+        languageLabel: "Langue Préférée",
+        globalVision: "Aperçu global da copropriété",
+        collectedFund: "Fonds Collectés",
+        overdueQuotas: "Charges Impayées",
+        pendingExpenses: "Dépenses en Attente",
+        budgetedOf: "Sur {amount} € budgétisés",
+        toReceive: "Montant à recevoir",
+        waitingApproval: "En attente d'approbation",
+        hello: "Bonjour, {name}",
+        unitSummary: "Résumé de votre unité ({unit})",
+        amountToPay: "Montant à Payer",
+        regularSituation: "Situation Régulière"
+      }
+    };
+
     function App() {
       const [firebaseUser, setFirebaseUser] = useState(null);
       const [isFirebaseReady, setIsFirebaseReady] = useState(false);
       const [currentUser, setCurrentUser] = useState(null);
       const [activeTab, setActiveTab] = useState('dashboard');
       const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+      const [lang, setLang] = useState('pt');
+
+      const t = (key, params = {}) => {
+        let text = translations[lang]?.[key] || translations['pt'][key] || key;
+        Object.keys(params).forEach(p => {
+          text = text.replace(`{${p}}`, params[p]);
+        });
+        return text;
+      };
+
+      useEffect(() => {
+        if (currentUser?.language && currentUser.language !== lang) {
+          setLang(currentUser.language);
+        }
+      }, [currentUser]);
 
       const [users, setUsers] = useState([]);
       const [quotas, setQuotas] = useState([]);
@@ -146,14 +251,14 @@
 
       const renderContent = () => {
         switch (activeTab) {
-          case 'dashboard': return isAdmin ? <AdminDashboard expenses={expenses} quotas={quotas} users={users} budgets={budgets} /> : <UserDashboard user={currentUser} quotas={quotas} expenses={expenses} budgets={budgets} users={users} />;
+          case 'dashboard': return isAdmin ? <AdminDashboard expenses={expenses} quotas={quotas} users={users} budgets={budgets} t={t} /> : <UserDashboard user={currentUser} quotas={quotas} expenses={expenses} budgets={budgets} users={users} t={t} />;
           case 'condo': return <CondoPage condo={condo} isAdmin={isAdmin} db={db} appId={appId} />;
           case 'documentos': return <DocumentsPage documents={documents} docTypes={docTypes} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} storage={storage} />;
           case 'despesas': return <ExpensesPage expenses={expenses} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} />;
           case 'orcamentos': return <BudgetsPage budgets={budgets} isAdmin={isAdmin} db={db} appId={appId} />;
           case 'conta-corrente': return isAdmin ? <CurrentAccountPage budgets={budgets} users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} /> : null;
           case 'fracoes': return <FractionsPage users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} budgets={budgets} />;
-          case 'definicoes': return <SettingsPage currentUser={currentUser} db={db} appId={appId} />;
+          case 'definicoes': return <SettingsPage currentUser={currentUser} db={db} appId={appId} t={t} />;
           default: return <AdminDashboard />;
         }
       };
@@ -172,17 +277,17 @@
             </div>
             
             <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-              <NavItem icon={<PieChart />} label="Resumo" active={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setIsMobileMenuOpen(false); }} />
-              <NavItem icon={<Home />} label="Condomínio" active={activeTab === 'condo'} onClick={() => { setActiveTab('condo'); setIsMobileMenuOpen(false); }} />
-              <NavItem icon={<FolderOpen />} label="Documentos" active={activeTab === 'documentos'} onClick={() => { setActiveTab('documentos'); setIsMobileMenuOpen(false); }} />
-              <NavItem icon={<Receipt />} label="Despesas" active={activeTab === 'despesas'} onClick={() => { setActiveTab('despesas'); setIsMobileMenuOpen(false); }} />
-              <NavItem icon={<Wallet />} label="Orçamentos" active={activeTab === 'orcamentos'} onClick={() => { setActiveTab('orcamentos'); setIsMobileMenuOpen(false); }} />
-              {isAdmin && <NavItem icon={<TrendingUp />} label="Conta Corrente" active={activeTab === 'conta-corrente'} onClick={() => { setActiveTab('conta-corrente'); setIsMobileMenuOpen(false); }} />}
-              <NavItem icon={<Users />} label="Frações" active={activeTab === 'fracoes'} onClick={() => { setActiveTab('fracoes'); setIsMobileMenuOpen(false); }} />
+              <NavItem icon={<PieChart />} label={t('summary')} active={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setIsMobileMenuOpen(false); }} />
+              <NavItem icon={<Home />} label={t('condo')} active={activeTab === 'condo'} onClick={() => { setActiveTab('condo'); setIsMobileMenuOpen(false); }} />
+              <NavItem icon={<FolderOpen />} label={t('documents')} active={activeTab === 'documentos'} onClick={() => { setActiveTab('documentos'); setIsMobileMenuOpen(false); }} />
+              <NavItem icon={<Receipt />} label={t('expenses')} active={activeTab === 'despesas'} onClick={() => { setActiveTab('despesas'); setIsMobileMenuOpen(false); }} />
+              <NavItem icon={<Wallet />} label={t('budgets')} active={activeTab === 'orcamentos'} onClick={() => { setActiveTab('orcamentos'); setIsMobileMenuOpen(false); }} />
+              {isAdmin && <NavItem icon={<TrendingUp />} label={t('currentAccount')} active={activeTab === 'conta-corrente'} onClick={() => { setActiveTab('conta-corrente'); setIsMobileMenuOpen(false); }} />}
+              <NavItem icon={<Users />} label={t('fractions')} active={activeTab === 'fracoes'} onClick={() => { setActiveTab('fracoes'); setIsMobileMenuOpen(false); }} />
             </nav>
             
             <div className="p-4 border-t border-slate-100 shrink-0">
-              <NavItem icon={<Settings />} label="Definições" active={activeTab === 'definicoes'} onClick={() => { setActiveTab('definicoes'); setIsMobileMenuOpen(false); }} />
+              <NavItem icon={<Settings />} label={t('settings')} active={activeTab === 'definicoes'} onClick={() => { setActiveTab('definicoes'); setIsMobileMenuOpen(false); }} />
               <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-xl mt-2 mb-4">
                 <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg">
                   {currentUser?.name?.charAt(0) || 'U'}
@@ -193,7 +298,7 @@
                 </div>
               </div>
               <button onClick={handleLogout} className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium text-red-600 rounded-xl hover:bg-red-50 transition-colors">
-                <LogOut className="w-5 h-5" /> Sair da Conta
+                <LogOut className="w-5 h-5" /> {t('logout')}
               </button>
             </div>
           </aside>
@@ -350,7 +455,7 @@
       );
     }
 
-    function UserDashboard({ user, quotas, expenses, budgets, users }) {
+    function UserDashboard({ user, quotas, expenses, budgets, users, t }) {
       const sortedBudgets = [...budgets].sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
       const currentBudget = sortedBudgets[0];
 
@@ -388,14 +493,14 @@
       return (
         <div className="space-y-6">
           <div className="pt-2">
-            <h2 className="text-[26px] font-bold text-slate-800 tracking-tight">Olá, {user.name.split(' ')[0]}</h2>
-            <p className="text-slate-500 text-sm mt-1">Resumo da sua fração ({user.fraction})</p>
+            <h2 className="text-[26px] font-bold text-slate-800 tracking-tight">{t('hello', { name: user.name.split(' ')[0] })}</h2>
+            <p className="text-slate-500 text-sm mt-1">{t('unitSummary', { unit: user.fraction })}</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className={`p-6 rounded-3xl border ${hasDebt ? 'bg-red-50 border-red-100' : 'bg-green-50 border-green-100'}`}>
               <div className="flex items-start justify-between">
                 <div>
-                  <p className={`text-sm font-semibold uppercase tracking-wider ${hasDebt ? 'text-red-800/70' : 'text-green-800/70'}`}>{hasDebt ? 'Valor a Pagar' : 'Situação Regular'}</p>
+                  <p className={`text-sm font-semibold uppercase tracking-wider ${hasDebt ? 'text-red-800/70' : 'text-green-800/70'}`}>{hasDebt ? t('amountToPay') : t('regularSituation')}</p>
                   <h3 className={`text-4xl font-bold mt-2 tracking-tight ${hasDebt ? 'text-red-600' : 'text-green-600'}`}>{pendingAmount.toFixed(2)} €</h3>
                 </div>
                 <div className={`p-3.5 rounded-2xl ${hasDebt ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>{hasDebt ? <AlertCircle className="w-6 h-6" /> : <CheckCircle className="w-6 h-6" />}</div>
@@ -407,7 +512,7 @@
       );
     }
 
-    function AdminDashboard({ expenses, quotas, users, budgets }) {
+    function AdminDashboard({ expenses, quotas, users, budgets, t }) {
       const sortedBudgets = [...budgets].sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
       const currentBudget = sortedBudgets[0];
       const rfPerc = currentBudget?.reserveFundPercentage ?? 10;
@@ -455,13 +560,13 @@
       return (
         <div className="space-y-6">
           <div className="pt-2">
-            <h2 className="text-[26px] font-bold text-slate-800 tracking-tight">Dashboard</h2>
-            <p className="text-slate-500 text-sm mt-1">Visão global do condomínio</p>
+            <h2 className="text-[26px] font-bold text-slate-800 tracking-tight">{t('dashboard')}</h2>
+            <p className="text-slate-500 text-sm mt-1">{t('globalVision')}</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <StatCard title="Fundo Recebido" value={`${collectedAmount.toFixed(2)} €`} subtitle={`De ${totalExpected.toFixed(2)} € orçamentados`} icon={<TrendingUp className="w-6 h-6 text-green-600" />} color="green" />
-            <StatCard title="Quotas em Atraso" value={`${totalDebt.toFixed(2)} €`} subtitle="Valor por receber" icon={<AlertCircle className="w-6 h-6 text-orange-600" />} color="orange" />
-            <StatCard title="Despesas Pendentes" value={`${pendingExpensesAmount.toFixed(2)} €`} subtitle="A aguardar aprovação" icon={<Clock className="w-6 h-6 text-blue-600" />} color="blue" />
+            <StatCard title={t('collectedFund')} value={`${collectedAmount.toFixed(2)} €`} subtitle={t('budgetedOf', { amount: totalExpected.toFixed(2) })} icon={<TrendingUp className="w-6 h-6 text-green-600" />} color="green" />
+            <StatCard title={t('overdueQuotas')} value={`${totalDebt.toFixed(2)} €`} subtitle={t('toReceive')} icon={<AlertCircle className="w-6 h-6 text-orange-600" />} color="orange" />
+            <StatCard title={t('pendingExpenses')} value={`${pendingExpensesAmount.toFixed(2)} €`} subtitle={t('waitingApproval')} icon={<Clock className="w-6 h-6 text-blue-600" />} color="blue" />
           </div>
           <AnnualQuotasTable currentBudget={currentBudget} users={users} />
         </div>
@@ -1576,8 +1681,9 @@
       );
     }
 
-    function SettingsPage({ currentUser, db, appId }) {
+    function SettingsPage({ currentUser, db, appId, t }) {
       const [name, setName] = useState(currentUser.name);
+      const [language, setLanguage] = useState(currentUser.language || 'pt');
       const [saving, setSaving] = useState(false);
       const [message, setMessage] = useState({ type: '', text: '' });
 
@@ -1585,10 +1691,13 @@
         e.preventDefault();
         setSaving(true); setMessage({ type: '', text: '' });
         try {
-          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', currentUser.firestoreId), { name });
-          setMessage({ type: 'success', text: 'Perfil guardado!' });
+          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', currentUser.firestoreId), { 
+            name,
+            language 
+          });
+          setMessage({ type: 'success', text: t('profileSaved') });
         } catch (err) {
-          setMessage({ type: 'error', text: 'Erro ao guardar.' });
+          setMessage({ type: 'error', text: t('errorSaving') });
         } finally {
           setSaving(false);
         }
@@ -1596,15 +1705,27 @@
 
       return (
         <div className="space-y-6 max-w-2xl">
-          <div className="pt-2"><h2 className="text-[26px] font-bold text-slate-800">Definições</h2></div>
+          <div className="pt-2"><h2 className="text-[26px] font-bold text-slate-800">{t('settings')}</h2></div>
           <form onSubmit={handleSave} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-6">
             {message.text && <div className={`p-4 rounded-xl text-sm font-medium ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{message.text}</div>}
             <div>
-              <label className="block text-sm font-semibold mb-2 ml-1 text-slate-700">O seu nome</label>
+              <label className="block text-sm font-semibold mb-2 ml-1 text-slate-700">{t('nameLabel')}</label>
               <input required type="text" className="w-full px-5 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={name} onChange={e => setName(e.target.value)} />
             </div>
+            <div>
+              <label className="block text-sm font-semibold mb-2 ml-1 text-slate-700">{t('languageLabel')}</label>
+              <select 
+                className="w-full px-5 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+                value={language}
+                onChange={e => setLanguage(e.target.value)}
+              >
+                <option value="pt">Português</option>
+                <option value="en">English</option>
+                <option value="fr">Français</option>
+              </select>
+            </div>
             <button type="submit" disabled={saving} className="w-full bg-blue-600 active:bg-blue-700 text-white px-6 py-4 rounded-xl font-semibold disabled:opacity-50">
-              {saving ? 'A guardar...' : 'Guardar Alterações'}
+              {saving ? t('saving') : t('save')}
             </button>
           </form>
         </div>
