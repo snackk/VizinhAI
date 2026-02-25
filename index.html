@@ -104,7 +104,12 @@
         hello: "Olá, {name}",
         unitSummary: "Resumo da sua fração ({unit})",
         amountToPay: "Valor a Pagar",
-        regularSituation: "Situação Regular"
+        regularSituation: "Situação Regular",
+        overdueMonths: "Meses em atraso",
+        months: {
+          0: "Janeiro", 1: "Fevereiro", 2: "Março", 3: "Abril", 4: "Maio", 5: "Junho",
+          6: "Julho", 7: "Agosto", 8: "Setembro", 9: "Outubro", 10: "Novembro", 11: "Dezembro"
+        }
       },
       en: {
         dashboard: "Dashboard",
@@ -133,7 +138,12 @@
         hello: "Hello, {name}",
         unitSummary: "Unit summary ({unit})",
         amountToPay: "Amount to Pay",
-        regularSituation: "Regular Situation"
+        regularSituation: "Regular Situation",
+        overdueMonths: "Overdue months",
+        months: {
+          0: "January", 1: "February", 2: "March", 3: "April", 4: "May", 5: "June",
+          6: "July", 7: "August", 8: "September", 9: "October", 10: "November", 11: "December"
+        }
       },
       fr: {
         dashboard: "Tableau de bord",
@@ -162,7 +172,12 @@
         hello: "Bonjour, {name}",
         unitSummary: "Résumé de votre unité ({unit})",
         amountToPay: "Montant à Payer",
-        regularSituation: "Situation Régulière"
+        regularSituation: "Situation Régulière",
+        overdueMonths: "Mois de retard",
+        months: {
+          0: "Janvier", 1: "Février", 2: "Mars", 3: "Avril", 4: "Mai", 5: "Juin",
+          6: "Juillet", 7: "Août", 8: "Septembre", 9: "Octobre", 10: "Novembre", 11: "Décembre"
+        }
       }
     };
 
@@ -176,6 +191,18 @@
 
       const t = (key, params = {}) => {
         let text = translations[lang]?.[key] || translations['pt'][key] || key;
+        
+        // Se a chave for complexa (ex: months.0), aceder ao objeto
+        if (key.includes('.')) {
+          const parts = key.split('.');
+          let current = translations[lang] || translations['pt'];
+          for (const part of parts) {
+            current = current?.[part];
+          }
+          if (typeof current === 'string') text = current;
+          else if (current === undefined) text = key;
+        }
+
         Object.keys(params).forEach(p => {
           text = text.replace(`{${p}}`, params[p]);
         });
@@ -456,6 +483,7 @@
     }
 
     function UserDashboard({ user, quotas, expenses, budgets, users, t }) {
+      const [isExpanded, setIsExpanded] = useState(false);
       const sortedBudgets = [...budgets].sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
       const currentBudget = sortedBudgets[0];
 
@@ -497,14 +525,33 @@
             <p className="text-slate-500 text-sm mt-1">{t('unitSummary', { unit: user.fraction })}</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className={`p-6 rounded-3xl border ${hasDebt ? 'bg-red-50 border-red-100' : 'bg-green-50 border-green-100'}`}>
+            <div 
+              onClick={() => hasDebt && setIsExpanded(!isExpanded)}
+              className={`p-6 rounded-3xl border transition-all duration-300 ${hasDebt ? 'bg-red-50 border-red-100 cursor-pointer hover:shadow-md' : 'bg-green-50 border-green-100'}`}
+            >
               <div className="flex items-start justify-between">
                 <div>
                   <p className={`text-sm font-semibold uppercase tracking-wider ${hasDebt ? 'text-red-800/70' : 'text-green-800/70'}`}>{hasDebt ? t('amountToPay') : t('regularSituation')}</p>
                   <h3 className={`text-4xl font-bold mt-2 tracking-tight ${hasDebt ? 'text-red-600' : 'text-green-600'}`}>{pendingAmount.toFixed(2)} €</h3>
                 </div>
-                <div className={`p-3.5 rounded-2xl ${hasDebt ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>{hasDebt ? <AlertCircle className="w-6 h-6" /> : <CheckCircle className="w-6 h-6" />}</div>
+                <div className={`p-3.5 rounded-2xl ${hasDebt ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                  {hasDebt ? (isExpanded ? <ChevronUp className="w-6 h-6" /> : <AlertCircle className="w-6 h-6" />) : <CheckCircle className="w-6 h-6" />}
+                </div>
               </div>
+              
+              {hasDebt && isExpanded && (
+                <div className="mt-6 pt-6 border-t border-red-200/50 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <p className="text-xs font-bold text-red-800/60 uppercase tracking-widest mb-4">{t('overdueMonths')}</p>
+                  {debtMonths.map((m, idx) => (
+                    <div key={idx} className="flex justify-between items-center bg-white/40 p-3 rounded-xl border border-red-100/50">
+                      <span className="text-sm font-semibold text-red-900 capitalize">
+                        {t(`months.${m.getMonth()}`)} {m.getFullYear()}
+                      </span>
+                      <span className="text-sm font-bold text-red-600">{totalMonthly.toFixed(2)} €</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           <AnnualQuotasTable currentBudget={currentBudget} users={users} />
@@ -566,7 +613,7 @@
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <StatCard title={t('collectedFund')} value={`${collectedAmount.toFixed(2)} €`} subtitle={t('budgetedOf', { amount: totalExpected.toFixed(2) })} icon={<TrendingUp className="w-6 h-6 text-green-600" />} color="green" />
             <StatCard title={t('overdueQuotas')} value={`${totalDebt.toFixed(2)} €`} subtitle={t('toReceive')} icon={<AlertCircle className="w-6 h-6 text-orange-600" />} color="orange" />
-            <StatCard title={t('pendingExpenses')} value={`${pendingExpensesAmount.toFixed(2)} €`} subtitle={t('waitingApproval')} icon={<Clock className="w-6 h-6 text-blue-600" />} color="blue" />
+            <!--<StatCard title={t('pendingExpenses')} value={`${pendingExpensesAmount.toFixed(2)} €`} subtitle={t('waitingApproval')} icon={<Clock className="w-6 h-6 text-blue-600" />} color="blue" />-->
           </div>
           <AnnualQuotasTable currentBudget={currentBudget} users={users} />
         </div>
