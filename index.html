@@ -2,453 +2,486 @@
 <html lang="pt">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+
   <title>VizinhAI - Gestão de Condomínio</title>
+
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VizinhAI">
+  <meta name="theme-color" content="#2563eb">
+
+  <link rel="apple-touch-icon" href="https://via.placeholder.com/192/2563eb/ffffff?text=V">
+
   <script src="https://cdn.tailwindcss.com"></script>
-  
+
+  <style>
+    /* Previne o "bounce" ao fazer scroll no iOS para parecer uma app nativa */
+    body {
+      overscroll-behavior-y: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Variáveis do iOS para proteger áreas seguras (Dynamic Island e Home Bar inferior) */
+    .safe-pt { padding-top: env(safe-area-inset-top); }
+    .safe-pb { padding-bottom: env(safe-area-inset-bottom); }
+    .safe-pl { padding-left: env(safe-area-inset-left); }
+    .safe-pr { padding-right: env(safe-area-inset-right); }
+
+    /* Ajuste de altura considerando a safe area no header */
+    .mobile-header {
+      padding-top: env(safe-area-inset-top);
+      box-sizing: content-box;
+    }
+  </style>
+
   <script>
     // Substitui com a tua configuração real do Firebase
-    window.__firebase_config = JSON.stringify({
-      apiKey: "A_TUA_API_KEY",
-      authDomain: "O_TEU_PROJECT_ID.firebaseapp.com",
-      projectId: "O_TEU_PROJECT_ID",
-      storageBucket: "O_TEU_PROJECT_ID.appspot.com",
-      messagingSenderId: "SENDER_ID",
-      appId: "APP_ID"
-    });
-    window.__app_id = "vizinhai-app"; // ID usado para as coleções no Firestore
+    window.__firebase_config = '__FIREBASE_CONFIG_PLACEHOLDER__';
+    window.__app_id = "vizinhai-app";
   </script>
 </head>
-<body>
-  <div id="root"></div>
+<body class="bg-slate-50">
+<div id="root"></div>
 
-  <script type="module">
-    import React, { useState, useEffect } from 'https://esm.sh/react@18.2.0';
-    import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
-    import { 
-      Home, Receipt, PieChart, Users, LogOut, Menu, X, 
-      AlertCircle, CheckCircle, Plus, FileText, Wallet, 
-      TrendingUp, Clock, ShieldAlert, FolderOpen, UploadCloud, 
-      Download, Settings, Save, Lock, User
-    } from 'https://esm.sh/lucide-react@0.292.0';
+<script type="module">
+  import React, { useState, useEffect } from 'https://esm.sh/react@18.2.0';
+  import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
+  import {
+    Home, Receipt, PieChart, Users, LogOut, Menu, X,
+    AlertCircle, CheckCircle, Plus, FileText, Wallet,
+    TrendingUp, Clock, ShieldAlert, FolderOpen, UploadCloud,
+    Download, Settings, Save, Lock, User
+  } from 'https://esm.sh/lucide-react@0.292.0';
 
-    // --- FIREBASE IMPORTS ---
-    import { initializeApp } from 'https://esm.sh/firebase@10.8.0/app';
-    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged } from 'https://esm.sh/firebase@10.8.0/auth';
-    import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, updateDoc } from 'https://esm.sh/firebase@10.8.0/firestore';
-    import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://esm.sh/firebase@10.8.0/storage';
+  // --- FIREBASE IMPORTS ---
+  import { initializeApp } from 'https://esm.sh/firebase@10.8.0/app';
+  import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged } from 'https://esm.sh/firebase@10.8.0/auth';
+  import { getFirestore, collection, onSnapshot, doc, setDoc, addDoc, updateDoc } from 'https://esm.sh/firebase@10.8.0/firestore';
+  import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://esm.sh/firebase@10.8.0/storage';
 
-    // --- FIREBASE SETUP ---
-    const firebaseConfig = window.__firebase_config ? JSON.parse(window.__firebase_config) : {};
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-    const storage = getStorage(app);
-    const appId = window.__app_id || 'default-app-id';
+  // --- FIREBASE SETUP ---
+  const firebaseConfig = window.__firebase_config ? JSON.parse(window.__firebase_config) : {};
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const storage = getStorage(app);
+  const appId = window.__app_id || 'default-app-id';
 
-    // --- MOCK DATA FOR SEEDING ---
-    const INITIAL_QUOTAS = [
-      { id: 'q1', userId: '2', month: 2, year: 2026, amount: 50.00, status: 'pending' },
-      { id: 'q2', userId: '3', month: 2, year: 2026, amount: 50.00, status: 'paid' },
-    ];
-    const INITIAL_EXPENSES = [
-      { id: 'e1', description: 'Limpeza Escadas (Fev)', amount: 60.00, date: '2026-02-15', status: 'approved', submittedBy: 'Admin' },
-    ];
-    const INITIAL_BUDGETS = [
-      { id: 'b1', year: 2026, totalAmount: 2400.00, monthlyQuota: 50.00, description: 'Orçamento Base 2026' },
-    ];
-    const DOCUMENT_CATEGORIES = ['Atas', 'Eletricidade', 'Água', 'Contrato Elevadores', 'Contrato Limpeza', 'Faturas'];
+  // --- MOCK DATA FOR SEEDING ---
+  const INITIAL_QUOTAS = [
+    { id: 'q1', userId: '2', month: 2, year: 2026, amount: 50.00, status: 'pending' },
+    { id: 'q2', userId: '3', month: 2, year: 2026, amount: 50.00, status: 'paid' },
+  ];
+  const INITIAL_EXPENSES = [
+    { id: 'e1', description: 'Limpeza Escadas (Fev)', amount: 60.00, date: '2026-02-15', status: 'approved', submittedBy: 'Admin' },
+  ];
+  const INITIAL_BUDGETS = [
+    { id: 'b1', year: 2026, totalAmount: 2400.00, monthlyQuota: 50.00, description: 'Orçamento Base 2026' },
+  ];
+  const DOCUMENT_CATEGORIES = ['Atas', 'Eletricidade', 'Água', 'Contrato Elevadores', 'Contrato Limpeza', 'Faturas'];
 
-    function App() {
-      const [firebaseUser, setFirebaseUser] = useState(null);
-      const [isFirebaseReady, setIsFirebaseReady] = useState(false);
-      const [currentUser, setCurrentUser] = useState(null);
-      const [activeTab, setActiveTab] = useState('dashboard');
-      const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  function App() {
+    const [firebaseUser, setFirebaseUser] = useState(null);
+    const [isFirebaseReady, setIsFirebaseReady] = useState(false);
+    const [currentUser, setCurrentUser] = useState(null);
+    const [activeTab, setActiveTab] = useState('dashboard');
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-      const [users, setUsers] = useState([]);
-      const [quotas, setQuotas] = useState([]);
-      const [expenses, setExpenses] = useState([]);
-      const [budgets, setBudgets] = useState([]);
-      const [documents, setDocuments] = useState([]);
+    const [users, setUsers] = useState([]);
+    const [quotas, setQuotas] = useState([]);
+    const [expenses, setExpenses] = useState([]);
+    const [budgets, setBudgets] = useState([]);
+    const [documents, setDocuments] = useState([]);
 
-      // 1. FIREBASE AUTH INITIALIZATION
-      useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-          setFirebaseUser(user);
-          if (user) {
-            // Fetch User Profile from Firestore
-            const userDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid);
-            onSnapshot(userDocRef, (docSnap) => {
-              if (docSnap.exists()) {
-                setCurrentUser({ firestoreId: docSnap.id, ...docSnap.data() });
-              }
-            });
-          } else {
-            setCurrentUser(null);
-          }
-          setIsFirebaseReady(true);
-        });
-        return () => unsubscribe();
-      }, []);
-
-      // 2. DATA SYNC
-      useEffect(() => {
-        if (!firebaseUser) return;
-        const getCol = (colName) => collection(db, 'artifacts', appId, 'public', 'data', colName);
-
-        const unsubUsers = onSnapshot(getCol('users'), (snap) => {
-          setUsers(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() })));
-        });
-
-        const unsubQuotas = onSnapshot(getCol('quotas'), (snap) => {
-          if (snap.empty) { INITIAL_QUOTAS.forEach(q => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quotas', q.id), q)); } 
-          else { setQuotas(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))); }
-        });
-
-        const unsubExpenses = onSnapshot(getCol('expenses'), (snap) => {
-          if (snap.empty) { INITIAL_EXPENSES.forEach(e => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expenses', e.id), e)); } 
-          else { setExpenses(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))); }
-        });
-
-        const unsubBudgets = onSnapshot(getCol('budgets'), (snap) => {
-          if (snap.empty) { INITIAL_BUDGETS.forEach(b => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'budgets', b.id), b)); } 
-          else { setBudgets(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))); }
-        });
-
-        const unsubDocs = onSnapshot(getCol('documents'), (snap) => {
-          setDocuments(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() })));
-        });
-
-        return () => { unsubUsers(); unsubQuotas(); unsubExpenses(); unsubBudgets(); unsubDocs(); };
-      }, [firebaseUser]);
-
-      const handleLogout = () => {
-        signOut(auth);
-      };
-
-      if (!isFirebaseReady) return <div className="h-screen w-full flex items-center justify-center bg-slate-50">A carregar o sistema...</div>;
-      if (!firebaseUser || !currentUser) return <LoginScreen />;
-
-      const isAdmin = currentUser.role === 'admin';
-
-      const renderContent = () => {
-        switch (activeTab) {
-          case 'dashboard': return isAdmin ? <AdminDashboard expenses={expenses} quotas={quotas} users={users} budgets={budgets} /> : <UserDashboard user={currentUser} quotas={quotas} expenses={expenses} />;
-          case 'documentos': return <DocumentsPage documents={documents} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} storage={storage} />;
-          case 'despesas': return <ExpensesPage expenses={expenses} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} />;
-          case 'orcamentos': return <BudgetsPage budgets={budgets} isAdmin={isAdmin} db={db} appId={appId} />;
-          case 'fracoes': return <FractionsPage users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} />;
-          case 'definicoes': return <SettingsPage currentUser={currentUser} db={db} appId={appId} />;
-          default: return <AdminDashboard />;
+    useEffect(() => {
+      const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        setFirebaseUser(user);
+        if (user) {
+          const userDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid);
+          onSnapshot(userDocRef, (docSnap) => {
+            if (docSnap.exists()) {
+              setCurrentUser({ firestoreId: docSnap.id, ...docSnap.data() });
+            }
+          });
+        } else {
+          setCurrentUser(null);
         }
-      };
+        setIsFirebaseReady(true);
+      });
+      return () => unsubscribe();
+    }, []);
 
-      return (
-        <div className="flex h-screen bg-slate-50 font-sans text-slate-800">
-          {isMobileMenuOpen && <div className="fixed inset-0 bg-slate-800/50 z-20 lg:hidden" onClick={() => setIsMobileMenuOpen(false)} />}
-          <aside className={`fixed inset-y-0 left-0 z-30 w-64 bg-white border-r border-slate-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:flex lg:flex-col ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-            <div className="flex items-center justify-between h-16 px-6 border-b border-slate-100">
+    useEffect(() => {
+      if (!firebaseUser) return;
+      const getCol = (colName) => collection(db, 'artifacts', appId, 'public', 'data', colName);
+
+      const unsubUsers = onSnapshot(getCol('users'), (snap) => setUsers(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))));
+      const unsubQuotas = onSnapshot(getCol('quotas'), (snap) => {
+        if (snap.empty) { INITIAL_QUOTAS.forEach(q => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quotas', q.id), q)); }
+        else { setQuotas(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))); }
+      });
+      const unsubExpenses = onSnapshot(getCol('expenses'), (snap) => {
+        if (snap.empty) { INITIAL_EXPENSES.forEach(e => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expenses', e.id), e)); }
+        else { setExpenses(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))); }
+      });
+      const unsubBudgets = onSnapshot(getCol('budgets'), (snap) => {
+        if (snap.empty) { INITIAL_BUDGETS.forEach(b => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'budgets', b.id), b)); }
+        else { setBudgets(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))); }
+      });
+      const unsubDocs = onSnapshot(getCol('documents'), (snap) => setDocuments(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))));
+
+      return () => { unsubUsers(); unsubQuotas(); unsubExpenses(); unsubBudgets(); unsubDocs(); };
+    }, [firebaseUser]);
+
+    const handleLogout = () => signOut(auth);
+
+    if (!isFirebaseReady) return <div className="h-screen w-full flex items-center justify-center bg-slate-50">A carregar o sistema...</div>;
+    if (!firebaseUser || !currentUser) return <LoginScreen />;
+
+    const isAdmin = currentUser.role === 'admin';
+
+    const renderContent = () => {
+      switch (activeTab) {
+        case 'dashboard': return isAdmin ? <AdminDashboard expenses={expenses} quotas={quotas} users={users} budgets={budgets} /> : <UserDashboard user={currentUser} quotas={quotas} expenses={expenses} />;
+        case 'documentos': return <DocumentsPage documents={documents} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} storage={storage} />;
+        case 'despesas': return <ExpensesPage expenses={expenses} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} />;
+        case 'orcamentos': return <BudgetsPage budgets={budgets} isAdmin={isAdmin} db={db} appId={appId} />;
+        case 'fracoes': return <FractionsPage users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} />;
+        case 'definicoes': return <SettingsPage currentUser={currentUser} db={db} appId={appId} />;
+        default: return <AdminDashboard />;
+      }
+    };
+
+    return (
+        // Aplicadas classes safe-pl, safe-pr para landscape e h-screen para fixar a app no ecrã
+        <div className="flex h-screen bg-slate-50 font-sans text-slate-800 safe-pl safe-pr">
+
+          {/* Menu de telemóvel escurecido (Overlay) */}
+          {isMobileMenuOpen && <div className="fixed inset-0 bg-slate-800/60 z-40 lg:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsMobileMenuOpen(false)} />}
+
+          {/* Sidebar - Agora respeita o topo e baixo do iPhone (safe-pt, safe-pb) */}
+          <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:flex lg:flex-col lg:shadow-none lg:border-r lg:border-slate-200 safe-pt safe-pb flex flex-col ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+            <div className="flex items-center justify-between h-16 px-6 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2">
                 <div className="bg-blue-600 p-1.5 rounded-lg"><Home className="w-5 h-5 text-white" /></div>
                 <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-blue-500">VizinhAI</span>
               </div>
-              <button className="lg:hidden text-slate-400" onClick={() => setIsMobileMenuOpen(false)}><X className="w-6 h-6" /></button>
+              <button className="lg:hidden text-slate-400 p-2 hover:bg-slate-100 rounded-full" onClick={() => setIsMobileMenuOpen(false)}><X className="w-6 h-6" /></button>
             </div>
-            <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+
+            <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
               <NavItem icon={<PieChart />} label="Resumo" active={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setIsMobileMenuOpen(false); }} />
               <NavItem icon={<FolderOpen />} label="Documentos" active={activeTab === 'documentos'} onClick={() => { setActiveTab('documentos'); setIsMobileMenuOpen(false); }} />
               <NavItem icon={<Receipt />} label="Despesas" active={activeTab === 'despesas'} onClick={() => { setActiveTab('despesas'); setIsMobileMenuOpen(false); }} />
               <NavItem icon={<Wallet />} label="Orçamentos" active={activeTab === 'orcamentos'} onClick={() => { setActiveTab('orcamentos'); setIsMobileMenuOpen(false); }} />
               <NavItem icon={<Users />} label="Frações" active={activeTab === 'fracoes'} onClick={() => { setActiveTab('fracoes'); setIsMobileMenuOpen(false); }} />
             </nav>
-            <div className="p-4 border-t border-slate-100">
+
+            <div className="p-4 border-t border-slate-100 shrink-0">
               <NavItem icon={<Settings />} label="Definições" active={activeTab === 'definicoes'} onClick={() => { setActiveTab('definicoes'); setIsMobileMenuOpen(false); }} />
               <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-xl mt-2 mb-4">
-                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+                <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg">
                   {currentUser?.name?.charAt(0) || 'U'}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900 truncate">{currentUser?.name}</p>
+                  <p className="text-sm font-semibold text-slate-900 truncate">{currentUser?.name}</p>
                   <p className="text-xs text-slate-500 truncate">{currentUser?.fraction} • {isAdmin ? 'Admin' : 'Condómino'}</p>
                 </div>
               </div>
-              <button onClick={handleLogout} className="flex items-center gap-3 w-full px-4 py-2 text-sm font-medium text-red-600 rounded-lg hover:bg-red-50 transition-colors">
+              <button onClick={handleLogout} className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium text-red-600 rounded-xl hover:bg-red-50 transition-colors">
                 <LogOut className="w-5 h-5" /> Sair da Conta
               </button>
             </div>
           </aside>
-          <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-4 lg:hidden">
-              <button onClick={() => setIsMobileMenuOpen(true)} className="text-slate-500"><Menu className="w-6 h-6" /></button>
-              <span className="font-semibold text-slate-800">VizinhAI</span>
-              <div className="w-6" />
+
+          {/* Main Content Area */}
+          <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
+
+            {/* Header Mobile: Usamos mobile-header do CSS para estender até ao topo do ecrã e bg-blue-600 para aspeto nativo */}
+            <header className="mobile-header bg-blue-600 text-white h-16 flex items-center justify-between px-4 lg:hidden shrink-0 shadow-md">
+              <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 -ml-2 text-white hover:bg-blue-700 rounded-full transition-colors"><Menu className="w-6 h-6" /></button>
+              <span className="font-semibold text-lg tracking-wide">VizinhAI</span>
+              <div className="w-6" /> {/* Espaçador para centrar o título */}
             </header>
-            <div className="flex-1 overflow-y-auto p-4 md:p-8">
-              <div className="max-w-5xl mx-auto">{renderContent()}</div>
+
+            {/* Scrollable Content: safe-pb garante que não fica por trás da barra do iPhone de fechar a app */}
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 safe-pb bg-slate-50/50">
+              <div className="max-w-5xl mx-auto pb-6">
+                {renderContent()}
+              </div>
             </div>
           </main>
         </div>
-      );
-    }
+    );
+  }
 
-    // --- COMPONENTS ---
-    function LoginScreen() {
-      const [email, setEmail] = useState('');
-      const [password, setPassword] = useState('');
-      const [error, setError] = useState('');
-      const [loading, setLoading] = useState(false);
+  // --- COMPONENTS ---
+  function LoginScreen() {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
 
-      const handleLogin = async (e) => {
-        e.preventDefault();
-        setLoading(true); setError('');
-        try {
-          await signInWithEmailAndPassword(auth, email, password);
-        } catch (err) {
-          setError('Credenciais incorretas ou conta inexistente.');
-        } finally {
-          setLoading(false);
-        }
-      };
+    const handleLogin = async (e) => {
+      e.preventDefault();
+      setLoading(true); setError('');
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+      } catch (err) {
+        setError('Credenciais incorretas ou conta inexistente.');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      return (
-        <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden">
-            <div className="bg-blue-600 px-6 py-8 text-center">
-              <div className="bg-white/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"><Home className="w-8 h-8 text-white" /></div>
-              <h1 className="text-2xl font-bold text-white">Bem-vindo ao VizinhAI</h1>
-              <p className="text-blue-100 mt-2">A gestão do seu condomínio, simplificada.</p>
+    return (
+        <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4 safe-pt safe-pb">
+          <div className="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100">
+            <div className="bg-blue-600 px-6 py-10 text-center relative overflow-hidden">
+              <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 rounded-full bg-blue-500 opacity-20"></div>
+              <div className="absolute bottom-0 left-0 -ml-8 -mb-8 w-24 h-24 rounded-full bg-blue-700 opacity-20"></div>
+
+              <div className="bg-white/20 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 backdrop-blur-sm shadow-inner relative z-10">
+                <Home className="w-10 h-10 text-white" />
+              </div>
+              <h1 className="text-3xl font-bold text-white tracking-tight relative z-10">VizinhAI</h1>
+              <p className="text-blue-100 mt-2 text-sm font-medium relative z-10">A gestão do seu condomínio na palma da mão.</p>
             </div>
+
             <div className="p-8">
-              {error && <div className="mb-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm flex items-start gap-2"><AlertCircle className="w-4 h-4 mt-0.5 shrink-0" /><span>{error}</span></div>}
-              <form onSubmit={handleLogin} className="space-y-6">
+              {error && <div className="mb-6 p-4 bg-red-50 text-red-700 border border-red-100 rounded-xl text-sm flex items-start gap-3"><AlertCircle className="w-5 h-5 shrink-0" /><span>{error}</span></div>}
+
+              <form onSubmit={handleLogin} className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">E-mail</label>
-                  <input type="email" required className="w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-blue-500" value={email} onChange={(e) => setEmail(e.target.value)} />
+                  <label className="block text-sm font-medium text-slate-700 mb-2 ml-1">E-mail</label>
+                  <input type="email" required className="w-full px-5 py-3.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="O seu e-mail" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Palavra-passe</label>
-                  <input type="password" required className="w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-blue-500" value={password} onChange={(e) => setPassword(e.target.value)} />
+                  <label className="block text-sm font-medium text-slate-700 mb-2 ml-1">Palavra-passe</label>
+                  <input type="password" required className="w-full px-5 py-3.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
                 </div>
-                <button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg transition-colors shadow-sm disabled:opacity-50">
-                  {loading ? 'A entrar...' : 'Iniciar Sessão'}
-                </button>
+                <div className="pt-2">
+                  <button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-xl transition-colors shadow-lg shadow-blue-600/20 disabled:opacity-70 flex justify-center items-center gap-2">
+                    {loading ? <span className="animate-pulse">A entrar...</span> : 'Iniciar Sessão'}
+                  </button>
+                </div>
               </form>
             </div>
           </div>
         </div>
-      );
-    }
+    );
+  }
 
-    function NavItem({ icon, label, active, onClick }) {
-      return (
-        <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-sm font-medium ${active ? 'bg-blue-50 text-blue-700 shadow-sm shadow-blue-100/50' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}>
-          {React.cloneElement(icon, { className: `w-5 h-5 ${active ? 'text-blue-600' : 'text-slate-400'}` })}
+  function NavItem({ icon, label, active, onClick }) {
+    return (
+        <button onClick={onClick} className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-xl transition-all duration-200 text-[15px] font-medium ${active ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 active:bg-slate-100'}`}>
+          {React.cloneElement(icon, { className: `w-[22px] h-[22px] ${active ? 'text-blue-600' : 'text-slate-400'}` })}
           {label}
         </button>
-      );
-    }
+    );
+  }
 
-    // --- DASHBOARDS ---
-    function UserDashboard({ user, quotas, expenses }) {
-      const myQuotas = quotas.filter(q => q.userId === user.id);
-      const pendingAmount = myQuotas.filter(q => q.status === 'pending').reduce((acc, curr) => acc + curr.amount, 0);
-      const hasDebt = pendingAmount > 0;
-      return (
+  // --- DASHBOARDS ---
+  function UserDashboard({ user, quotas, expenses }) {
+    const myQuotas = quotas.filter(q => q.userId === user.id);
+    const pendingAmount = myQuotas.filter(q => q.status === 'pending').reduce((acc, curr) => acc + curr.amount, 0);
+    const hasDebt = pendingAmount > 0;
+    return (
         <div className="space-y-6">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-800">Olá, {user.name.split(' ')[0]}</h2>
-            <p className="text-slate-500">Resumo da sua fração ({user.fraction})</p>
+          <div className="pt-2">
+            <h2 className="text-[26px] font-bold text-slate-800 tracking-tight">Olá, {user.name.split(' ')[0]}</h2>
+            <p className="text-slate-500 text-sm mt-1">Resumo da sua fração ({user.fraction})</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className={`p-6 rounded-2xl border ${hasDebt ? 'bg-red-50 border-red-100' : 'bg-green-50 border-green-100'}`}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className={`p-6 rounded-3xl border ${hasDebt ? 'bg-red-50 border-red-100' : 'bg-green-50 border-green-100'}`}>
               <div className="flex items-start justify-between">
                 <div>
-                  <p className={`text-sm font-medium ${hasDebt ? 'text-red-800' : 'text-green-800'}`}>{hasDebt ? 'Valor a Pagar' : 'Situação Regularizada'}</p>
-                  <h3 className={`text-4xl font-bold mt-2 ${hasDebt ? 'text-red-600' : 'text-green-600'}`}>{pendingAmount.toFixed(2)} €</h3>
+                  <p className={`text-sm font-semibold uppercase tracking-wider ${hasDebt ? 'text-red-800/70' : 'text-green-800/70'}`}>{hasDebt ? 'Valor a Pagar' : 'Situação Regular'}</p>
+                  <h3 className={`text-4xl font-bold mt-2 tracking-tight ${hasDebt ? 'text-red-600' : 'text-green-600'}`}>{pendingAmount.toFixed(2)} €</h3>
                 </div>
-                <div className={`p-3 rounded-full ${hasDebt ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>{hasDebt ? <AlertCircle className="w-6 h-6" /> : <CheckCircle className="w-6 h-6" />}</div>
+                <div className={`p-3.5 rounded-2xl ${hasDebt ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>{hasDebt ? <AlertCircle className="w-6 h-6" /> : <CheckCircle className="w-6 h-6" />}</div>
               </div>
             </div>
           </div>
         </div>
-      );
-    }
+    );
+  }
 
-    function AdminDashboard({ expenses, quotas, users, budgets }) {
-      const totalExpected = budgets[0]?.totalAmount || 0;
-      const pendingExpensesAmount = expenses.filter(e => e.status === 'pending').reduce((acc, curr) => acc + curr.amount, 0);
-      const totalDebt = quotas.filter(q => q.status === 'pending').reduce((acc, curr) => acc + curr.amount, 0);
-      const collectedAmount = quotas.filter(q => q.status === 'paid').reduce((acc, curr) => acc + curr.amount, 0);
+  function AdminDashboard({ expenses, quotas, users, budgets }) {
+    const totalExpected = budgets[0]?.totalAmount || 0;
+    const pendingExpensesAmount = expenses.filter(e => e.status === 'pending').reduce((acc, curr) => acc + curr.amount, 0);
+    const totalDebt = quotas.filter(q => q.status === 'pending').reduce((acc, curr) => acc + curr.amount, 0);
+    const collectedAmount = quotas.filter(q => q.status === 'paid').reduce((acc, curr) => acc + curr.amount, 0);
 
-      return (
+    return (
         <div className="space-y-6">
-          <div><h2 className="text-2xl font-bold text-slate-800">Backoffice de Gestão</h2></div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="pt-2">
+            <h2 className="text-[26px] font-bold text-slate-800 tracking-tight">Dashboard</h2>
+            <p className="text-slate-500 text-sm mt-1">Visão global do condomínio</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <StatCard title="Fundo Recebido" value={`${collectedAmount.toFixed(2)} €`} subtitle={`De ${totalExpected.toFixed(2)} € orçamentados`} icon={<TrendingUp className="w-6 h-6 text-green-600" />} color="green" />
             <StatCard title="Quotas em Atraso" value={`${totalDebt.toFixed(2)} €`} subtitle="Valor por receber" icon={<AlertCircle className="w-6 h-6 text-orange-600" />} color="orange" />
             <StatCard title="Despesas Pendentes" value={`${pendingExpensesAmount.toFixed(2)} €`} subtitle="A aguardar aprovação" icon={<Clock className="w-6 h-6 text-blue-600" />} color="blue" />
           </div>
         </div>
-      );
-    }
+    );
+  }
 
-    function StatCard({ title, value, subtitle, icon, color }) {
-      const bgColors = { green: 'bg-green-50 border-green-100', orange: 'bg-orange-50 border-orange-100', blue: 'bg-blue-50 border-blue-100' };
-      return (
-        <div className={`p-6 rounded-2xl border ${bgColors[color]} shadow-sm`}>
+  function StatCard({ title, value, subtitle, icon, color }) {
+    const bgColors = { green: 'bg-green-50 border-green-100', orange: 'bg-orange-50 border-orange-100', blue: 'bg-blue-50 border-blue-100' };
+    return (
+        <div className={`p-6 rounded-3xl border ${bgColors[color]} shadow-sm`}>
           <div className="flex justify-between items-start">
-            <div><p className="text-sm font-medium text-slate-600 mb-1">{title}</p><h3 className="text-2xl font-bold text-slate-900">{value}</h3><p className="text-xs text-slate-500 mt-2">{subtitle}</p></div>
-            <div className="p-3 bg-white rounded-xl shadow-sm">{icon}</div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-600/70 mb-1">{title}</p>
+              <h3 className="text-3xl font-bold text-slate-900 tracking-tight">{value}</h3>
+              <p className="text-[13px] text-slate-500 mt-2 font-medium">{subtitle}</p>
+            </div>
+            <div className="p-3 bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-white">{icon}</div>
           </div>
         </div>
-      );
-    }
+    );
+  }
 
-    function DocumentsPage({ documents, isAdmin, currentUser, db, appId, storage }) {
-      return <div><h2 className="text-2xl font-bold text-slate-800">Documentos</h2><p className="text-slate-500">Módulo de Documentos</p></div>;
-    }
+  // --- SUB-PAGES ---
+  function DocumentsPage({ documents, isAdmin, currentUser, db, appId, storage }) {
+    return <div className="pt-2"><h2 className="text-[26px] font-bold text-slate-800">Documentos</h2><p className="text-slate-500">Módulo de Documentos</p></div>;
+  }
 
-    function ExpensesPage({ expenses, isAdmin, currentUser, db, appId }) {
-      return <div><h2 className="text-2xl font-bold text-slate-800">Despesas</h2><p className="text-slate-500">Módulo de Despesas</p></div>;
-    }
+  function ExpensesPage({ expenses, isAdmin, currentUser, db, appId }) {
+    return <div className="pt-2"><h2 className="text-[26px] font-bold text-slate-800">Despesas</h2><p className="text-slate-500">Módulo de Despesas</p></div>;
+  }
 
-    function BudgetsPage({ budgets, isAdmin, db, appId }) {
-      return <div><h2 className="text-2xl font-bold text-slate-800">Orçamentos</h2><p className="text-slate-500">Módulo de Orçamentos</p></div>;
-    }
+  function BudgetsPage({ budgets, isAdmin, db, appId }) {
+    return <div className="pt-2"><h2 className="text-[26px] font-bold text-slate-800">Orçamentos</h2><p className="text-slate-500">Módulo de Orçamentos</p></div>;
+  }
 
-    // --- FRACTIONS PAGE WITH AUTH CREATION ---
-    function FractionsPage({ users, quotas, isAdmin, db, appId }) {
-      const [showForm, setShowForm] = useState(false);
-      const [newName, setNewName] = useState('');
-      const [newEmail, setNewEmail] = useState('');
-      const [newFraction, setNewFraction] = useState('');
-      const [msg, setMsg] = useState({ type: '', text: '' });
-      const [loading, setLoading] = useState(false);
+  function FractionsPage({ users, quotas, isAdmin, db, appId }) {
+    const [showForm, setShowForm] = useState(false);
+    const [newName, setNewName] = useState('');
+    const [newEmail, setNewEmail] = useState('');
+    const [newFraction, setNewFraction] = useState('');
+    const [msg, setMsg] = useState({ type: '', text: '' });
+    const [loading, setLoading] = useState(false);
 
-      const handleCreateUser = async (e) => {
-        e.preventDefault();
-        setLoading(true); setMsg({ type: '', text: '' });
-        try {
-          // Firebase Secundário para não forçar logout ao Admin
-          const secondaryApp = initializeApp(firebaseConfig, `TempApp-${Date.now()}`);
-          const secondaryAuth = getAuth(secondaryApp);
-          
-          const tempPassword = Math.random().toString(36).slice(-10) + "A1!";
-          const userCred = await createUserWithEmailAndPassword(secondaryAuth, newEmail, tempPassword);
+    const handleCreateUser = async (e) => {
+      e.preventDefault();
+      setLoading(true); setMsg({ type: '', text: '' });
+      try {
+        const secondaryApp = initializeApp(firebaseConfig, `TempApp-${Date.now()}`);
+        const secondaryAuth = getAuth(secondaryApp);
+        const tempPassword = Math.random().toString(36).slice(-10) + "A1!";
+        const userCred = await createUserWithEmailAndPassword(secondaryAuth, newEmail, tempPassword);
 
-          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userCred.user.uid), {
-            id: userCred.user.uid,
-            name: newName,
-            email: newEmail,
-            fraction: newFraction,
-            role: 'user'
-          });
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userCred.user.uid), {
+          id: userCred.user.uid, name: newName, email: newEmail, fraction: newFraction, role: 'user'
+        });
+        await sendPasswordResetEmail(auth, newEmail);
+        await signOut(secondaryAuth);
 
-          await sendPasswordResetEmail(auth, newEmail);
-          await signOut(secondaryAuth);
-          
-          setMsg({ type: 'success', text: 'Condómino criado e e-mail enviado!' });
-          setNewName(''); setNewEmail(''); setNewFraction('');
-          setTimeout(() => setShowForm(false), 3000);
-        } catch (err) {
-          setMsg({ type: 'error', text: 'Erro: ' + err.message });
-        } finally {
-          setLoading(false);
-        }
-      };
+        setMsg({ type: 'success', text: 'Condómino adicionado!' });
+        setNewName(''); setNewEmail(''); setNewFraction('');
+        setTimeout(() => setShowForm(false), 3000);
+      } catch (err) {
+        setMsg({ type: 'error', text: 'Erro: ' + err.message });
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      const fractionsList = users.map(user => {
-        const userQuotas = quotas.filter(q => q.userId === user.id);
-        const debt = userQuotas.filter(q => q.status === 'pending').reduce((acc, curr) => acc + curr.amount, 0);
-        return { ...user, debt };
-      });
+    const fractionsList = users.map(user => {
+      const userQuotas = quotas.filter(q => q.userId === user.id);
+      const debt = userQuotas.filter(q => q.status === 'pending').reduce((acc, curr) => acc + curr.amount, 0);
+      return { ...user, debt };
+    });
 
-      return (
+    return (
         <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <div><h2 className="text-2xl font-bold text-slate-800">Frações</h2></div>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-2">
+            <div><h2 className="text-[26px] font-bold text-slate-800">Frações</h2></div>
             {isAdmin && (
-              <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium">
-                {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />} Novo Condómino
-              </button>
+                <button onClick={() => setShowForm(!showForm)} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-3 rounded-xl font-semibold active:bg-blue-700 transition-colors">
+                  {showForm ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />} {showForm ? 'Cancelar' : 'Adicionar'}
+                </button>
             )}
           </div>
 
           {showForm && isAdmin && (
-            <form onSubmit={handleCreateUser} className="bg-white p-6 rounded-2xl border shadow-sm">
-              <h3 className="font-semibold mb-4">Adicionar Condómino</h3>
-              {msg.text && <div className={`mb-4 p-3 rounded text-sm ${msg.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{msg.text}</div>}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <input required type="text" placeholder="Nome" value={newName} onChange={e => setNewName(e.target.value)} className="px-3 py-2 border rounded-lg" />
-                <input required type="email" placeholder="E-mail" value={newEmail} onChange={e => setNewEmail(e.target.value)} className="px-3 py-2 border rounded-lg" />
-                <input required type="text" placeholder="Fração (Ex: 1º Esq)" value={newFraction} onChange={e => setNewFraction(e.target.value)} className="px-3 py-2 border rounded-lg" />
-              </div>
-              <button type="submit" disabled={loading} className="mt-4 bg-slate-900 text-white px-6 py-2 rounded-lg font-medium disabled:opacity-50">
-                {loading ? 'A criar...' : 'Criar Utilizador'}
-              </button>
-            </form>
+              <form onSubmit={handleCreateUser} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                <h3 className="font-semibold mb-5 text-lg">Novo Condómino</h3>
+                {msg.text && <div className={`mb-5 p-4 rounded-xl text-sm font-medium ${msg.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{msg.text}</div>}
+                <div className="grid grid-cols-1 gap-4">
+                  <input required type="text" placeholder="Nome completo" value={newName} onChange={e => setNewName(e.target.value)} className="px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
+                  <input required type="email" placeholder="E-mail" value={newEmail} onChange={e => setNewEmail(e.target.value)} className="px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
+                  <input required type="text" placeholder="Fração (Ex: 1º Esq)" value={newFraction} onChange={e => setNewFraction(e.target.value)} className="px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <button type="submit" disabled={loading} className="mt-5 w-full bg-slate-900 text-white px-6 py-4 rounded-xl font-semibold disabled:opacity-50">
+                  {loading ? 'A guardar...' : 'Guardar Condómino'}
+                </button>
+              </form>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {fractionsList.map(frac => (
-              <div key={frac.firestoreId} className="bg-white p-6 rounded-2xl border shadow-sm flex flex-col justify-between">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="font-bold text-lg">{frac.fraction}</h3>
-                    <p className="text-slate-500 text-sm">{frac.name}</p>
+                <div key={frac.firestoreId} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="font-bold text-xl tracking-tight">{frac.fraction}</h3>
+                      <p className="text-slate-500 text-[15px] mt-1">{frac.name}</p>
+                    </div>
+                    {frac.role === 'admin' && <span className="bg-blue-50 text-blue-700 text-xs px-2.5 py-1.5 rounded-lg font-bold tracking-wide uppercase">Admin</span>}
                   </div>
-                  {frac.role === 'admin' && <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-md font-semibold">Admin</span>}
+                  <div className="pt-4 border-t border-slate-100 flex justify-between items-center">
+                    <span className="text-sm font-medium text-slate-400">Estado</span>
+                    {frac.debt > 0 ? <span className="text-red-600 font-bold bg-red-50 px-3 py-1.5 rounded-xl text-sm">Em dívida</span> : <span className="text-green-600 font-bold bg-green-50 px-3 py-1.5 rounded-xl text-sm">Regular</span>}
+                  </div>
                 </div>
-                <div className="pt-4 border-t flex justify-between items-center">
-                  <span className="text-sm text-slate-500">Estado:</span>
-                  {frac.debt > 0 ? <span className="text-red-600 font-bold bg-red-50 px-3 py-1 rounded-full text-sm">Dívida: {frac.debt.toFixed(2)} €</span> : <span className="text-green-600 font-bold bg-green-50 px-3 py-1 rounded-full text-sm">Regularizado</span>}
-                </div>
-              </div>
             ))}
           </div>
         </div>
-      );
-    }
+    );
+  }
 
-    function SettingsPage({ currentUser, db, appId }) {
-      const [name, setName] = useState(currentUser.name);
-      const [saving, setSaving] = useState(false);
-      const [message, setMessage] = useState({ type: '', text: '' });
+  function SettingsPage({ currentUser, db, appId }) {
+    const [name, setName] = useState(currentUser.name);
+    const [saving, setSaving] = useState(false);
+    const [message, setMessage] = useState({ type: '', text: '' });
 
-      const handleSave = async (e) => {
-        e.preventDefault();
-        setSaving(true); setMessage({ type: '', text: '' });
-        try {
-          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', currentUser.firestoreId), { name });
-          setMessage({ type: 'success', text: 'Perfil atualizado com sucesso!' });
-        } catch (err) {
-          setMessage({ type: 'error', text: 'Erro ao atualizar definições.' });
-        } finally {
-          setSaving(false);
-        }
-      };
+    const handleSave = async (e) => {
+      e.preventDefault();
+      setSaving(true); setMessage({ type: '', text: '' });
+      try {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', currentUser.firestoreId), { name });
+        setMessage({ type: 'success', text: 'Perfil guardado!' });
+      } catch (err) {
+        setMessage({ type: 'error', text: 'Erro ao guardar.' });
+      } finally {
+        setSaving(false);
+      }
+    };
 
-      return (
+    return (
         <div className="space-y-6 max-w-2xl">
-          <div><h2 className="text-2xl font-bold">Definições</h2></div>
-          <form onSubmit={handleSave} className="bg-white p-6 rounded-2xl border shadow-sm space-y-6">
-            {message.text && <div className={`p-4 rounded-lg text-sm ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{message.text}</div>}
+          <div className="pt-2"><h2 className="text-[26px] font-bold text-slate-800">Definições</h2></div>
+          <form onSubmit={handleSave} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+            {message.text && <div className={`p-4 rounded-xl text-sm font-medium ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{message.text}</div>}
             <div>
-              <label className="block text-sm font-medium mb-2">Nome de Apresentação</label>
-              <input required type="text" className="w-full px-4 py-2 border rounded-lg" value={name} onChange={e => setName(e.target.value)} />
+              <label className="block text-sm font-semibold mb-2 ml-1 text-slate-700">O seu nome</label>
+              <input required type="text" className="w-full px-5 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={name} onChange={e => setName(e.target.value)} />
             </div>
-            <button type="submit" disabled={saving} className="bg-blue-600 text-white px-6 py-2.5 rounded-lg font-medium disabled:opacity-50">
+            <button type="submit" disabled={saving} className="w-full bg-blue-600 active:bg-blue-700 text-white px-6 py-4 rounded-xl font-semibold disabled:opacity-50">
               {saving ? 'A guardar...' : 'Guardar Alterações'}
             </button>
           </form>
         </div>
-      );
-    }
+    );
+  }
 
-    // --- INICIALIZAÇÃO DO REACT ---
-    const root = createRoot(document.getElementById('root'));
-    root.render(<App />);
-  </script>
+  // --- INICIALIZAÇÃO DO REACT ---
+  const root = createRoot(document.getElementById('root'));
+  root.render(<App />);
+</script>
 </body>
 </html>
