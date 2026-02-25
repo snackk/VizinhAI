@@ -363,7 +363,7 @@
       let totalDebt = 0;
       const now = new Date();
 
-      users.filter(u => u.role !== 'admin').forEach(user => {
+      users.forEach(user => {
         const perm = parseFloat(user.permilagem) || 0;
         const quotaBase = (monthlyTotal * (perm / 1000));
         const reserveFund = quotaBase * (rfPerc / 100);
@@ -1290,8 +1290,6 @@
       };
 
       const fractionsList = users.map(user => {
-        if (user.role === 'admin') return { ...user, debt: 0 };
-        
         const perm = parseFloat(user.permilagem) || 0;
         const quotaBase = (monthlyTotal * (perm / 1000));
         const reserveFund = quotaBase * (rfPerc / 100);
@@ -1450,7 +1448,7 @@
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {users.filter(u => u.role !== 'admin').map(user => {
+                {users.map(user => {
                   const perm = parseFloat(user.permilagem) || 0;
                   const quotaBase = (monthlyTotal * (perm / 1000));
                   const reserveFund = quotaBase * (rfPerc / 100);
