@@ -2493,12 +2493,14 @@
                 // --- CABEÇALHO DIREITO (Dados do Condómino) ---
                 // Alinhado horizontalmente com o fim do bloco do condomínio (nifY)
                 const rightX = 195;
-                docPdf.text("Exmo(a) Sr.(a):", rightX, nifY - 10, { align: "right" });
-                docPdf.text(user.name, rightX, nifY - 5, { align: "right" });
-                docPdf.text(`Fração: ${user.fraction}`, rightX, nifY, { align: "right" });
+                docPdf.setFont("helvetica", "bold");
+                docPdf.text("Exmo(a) Sr.(a):", rightX, nifY + 10, { align: "right" });
+                docPdf.setFont("helvetica", "normal");
+                docPdf.text(user.name, rightX, nifY + 15, { align: "right" });
+                docPdf.text(`Fração: ${user.fraction}`, rightX, nifY + 20, { align: "right" });
 
                 // --- DADOS DO RECIBO ---
-                const midY = nifY + 20;
+                const midY = nifY + 40;
                 docPdf.setFont("helvetica", "bold");
                 docPdf.text(`V/ NIF: ${user.nif || '999999990'}`, 15, midY);
 
