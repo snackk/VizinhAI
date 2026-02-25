@@ -120,7 +120,7 @@
         nifLabel: "NIF (Contribuinte)",
         nifPlaceholder: "123456789",
         promoteAdmin: "Promover a Administrador",
-        promoteConfirm: "Tem a certeza que deseja promover {name} a Administrador? Você deixará de ser administrador e a sua sessão será terminada.",
+        promoteConfirm: "Tem a certeza que deseja promover {name} a Administrador?",
         currentAdmin: "Administrador em Funções",
         adminName: "Nome",
         adminEmail: "E-mail",
@@ -134,7 +134,13 @@
         condoNif: "NIF",
         condoIban: "IBAN",
         confirmDeleteCondo: "Tem a certeza que deseja eliminar este condomínio? Todos os dados associados serão perdidos.",
-        switchCondo: "Mudar Condomínio"
+        switchCondo: "Mudar Condomínio",
+        forgotPassword: "Esqueceu-se da palavra-passe?",
+        resetPassword: "Recuperar Palavra-passe",
+        sendResetLink: "Enviar link de recuperação",
+        backToLogin: "Voltar ao login",
+        resetSent: "Link de recuperação enviado para o seu e-mail!",
+        errorReset: "Erro ao enviar e-mail de recuperação. Verifique o endereço."
       },
       en: {
         dashboard: "Dashboard",
@@ -178,7 +184,7 @@
         nifLabel: "Tax ID (NIF)",
         nifPlaceholder: "123456789",
         promoteAdmin: "Promote to Admin",
-        promoteConfirm: "Are you sure you want to promote {name} to Admin? You will no longer be an admin and your session will be terminated.",
+        promoteConfirm: "Are you sure you want to promote {name} to Admin?",
         currentAdmin: "Current Administrator",
         adminName: "Name",
         adminEmail: "Email",
@@ -192,7 +198,13 @@
         condoNif: "NIF",
         condoIban: "IBAN",
         confirmDeleteCondo: "Are you sure you want to delete this condo? All associated data will be lost.",
-        switchCondo: "Switch Condo"
+        switchCondo: "Switch Condo",
+        forgotPassword: "Forgot your password?",
+        resetPassword: "Reset Password",
+        sendResetLink: "Send reset link",
+        backToLogin: "Back to login",
+        resetSent: "Reset link sent to your email!",
+        errorReset: "Error sending reset email. Please check the address."
       },
       fr: {
         dashboard: "Tableau de bord",
@@ -236,7 +248,7 @@
         nifLabel: "NIF (Contribuable)",
         nifPlaceholder: "123456789",
         promoteAdmin: "Promouvoir en tant qu'Administrateur",
-        promoteConfirm: "Êtes-vous sûr de vouloir promouvoir {name} au rang d'Administrateur ? Vous ne serez plus administrateur et votre session sera terminée.",
+        promoteConfirm: "Êtes-vous sûr de vouloir promouvoir {name} au rang d'Administrateur ?",
         currentAdmin: "Administrateur Actuel",
         adminName: "Nom",
         adminEmail: "E-mail",
@@ -250,7 +262,13 @@
         condoNif: "NIF",
         condoIban: "IBAN",
         confirmDeleteCondo: "Êtes-vous sûr de vouloir supprimer cette copropriété ? Toutes les données associées seront perdues.",
-        switchCondo: "Changer de copropriété"
+        switchCondo: "Changer de copropriété",
+        forgotPassword: "Mot de passe oublié ?",
+        resetPassword: "Réinitialiser le mot de passe",
+        sendResetLink: "Envoyer le lien de récupération",
+        backToLogin: "Retour à la connexion",
+        resetSent: "Lien de récupération envoyé à votre adresse e-mail !",
+        errorReset: "Erreur lors de l'envoi de l'e-mail de récupération. Veuillez vérifier l'adresse."
       }
     };
 
@@ -714,6 +732,8 @@
       const [password, setPassword] = useState('');
       const [error, setError] = useState('');
       const [loading, setLoading] = useState(false);
+      const [showReset, setShowReset] = useState(false);
+      const [resetSuccess, setResetSuccess] = useState(false);
 
       const handleLogin = async (e) => {
         e.preventDefault();
@@ -726,6 +746,57 @@
           setLoading(false);
         }
       };
+
+      const handleResetPassword = async (e) => {
+        e.preventDefault();
+        setLoading(true); setError(''); setResetSuccess(false);
+        try {
+          await sendPasswordResetEmail(auth, email);
+          setResetSuccess(true);
+        } catch (err) {
+          setError(t('errorReset'));
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      if (showReset) {
+        return (
+          <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4 safe-pt safe-pb">
+            <div className="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100">
+              <div className="bg-blue-600 px-6 py-10 text-center relative overflow-hidden">
+                <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 rounded-full bg-blue-500 opacity-20"></div>
+                <div className="absolute bottom-0 left-0 -ml-8 -mb-8 w-24 h-24 rounded-full bg-blue-700 opacity-20"></div>
+                
+                <div className="bg-white/20 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 backdrop-blur-sm shadow-inner relative z-10">
+                  <Lock className="w-10 h-10 text-white" />
+                </div>
+                <h1 className="text-3xl font-bold text-white tracking-tight relative z-10">{t('resetPassword')}</h1>
+              </div>
+              
+              <div className="p-8">
+                {error && <div className="mb-6 p-4 bg-red-50 text-red-700 border border-red-100 rounded-xl text-sm flex items-start gap-3"><AlertCircle className="w-5 h-5 shrink-0" /><span>{error}</span></div>}
+                {resetSuccess && <div className="mb-6 p-4 bg-green-50 text-green-700 border border-green-100 rounded-xl text-sm flex items-start gap-3"><CheckCircle className="w-5 h-5 shrink-0" /><span>{t('resetSent')}</span></div>}
+                
+                <form onSubmit={handleResetPassword} className="space-y-5">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2 ml-1">E-mail</label>
+                    <input type="email" required className="w-full px-5 py-3.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="O seu e-mail" />
+                  </div>
+                  <div className="pt-2">
+                    <button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-xl transition-colors shadow-lg shadow-blue-600/20 disabled:opacity-70 flex justify-center items-center gap-2">
+                      {loading ? <span className="animate-pulse">A enviar...</span> : t('sendResetLink')}
+                    </button>
+                  </div>
+                  <button type="button" onClick={() => { setShowReset(false); setError(''); setResetSuccess(false); }} className="w-full text-center text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors pt-2">
+                    {t('backToLogin')}
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        );
+      }
 
       return (
         <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4 safe-pt safe-pb">
@@ -750,7 +821,10 @@
                   <input type="email" required className="w-full px-5 py-3.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="O seu e-mail" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2 ml-1">Palavra-passe</label>
+                  <div className="flex justify-between items-center mb-2 ml-1">
+                    <label className="block text-sm font-medium text-slate-700">Palavra-passe</label>
+                    <button type="button" onClick={() => { setShowReset(true); setError(''); setResetSuccess(false); }} className="text-xs font-semibold text-blue-600 hover:text-blue-700">{t('forgotPassword')}</button>
+                  </div>
                   <input type="password" required className="w-full px-5 py-3.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
                 </div>
                 <div className="pt-2">
@@ -1884,12 +1958,13 @@
           await updateDoc(doc(db, 'condos', selectedCondoId, 'users', user.firestoreId), {
             role: 'admin'
           });
-          // 2. Despromover o administrador atual no condomínio
-          await updateDoc(doc(db, 'condos', selectedCondoId, 'users', currentUser.firestoreId), {
-            role: 'user'
+          
+          // 2. Atualizar o papel global (necessário para acesso correto a outros condomínios/visão global)
+          await updateDoc(doc(db, 'users', user.firestoreId), {
+            role: 'admin'
           });
-          // Nota: O papel global na coleção 'users' pode precisar de ajuste se for o único admin de todos os seus condos
-          alert('Papéis atualizados no condomínio.');
+
+          alert('Utilizador promovido a administrador.');
         } catch (err) {
           alert('Erro ao promover administrador: ' + err.message);
         } finally {
@@ -2045,7 +2120,7 @@
                     {frac.role === 'admin' ? (
                       <span className="bg-blue-50 text-blue-700 text-[10px] px-2 py-1 rounded-lg font-bold tracking-wide uppercase">Admin</span>
                     ) : (
-                      isAdmin && (
+                      currentUser.role === 'backoffice' && (
                         <button 
                           onClick={() => handlePromoteAdmin(frac)}
                           className="bg-slate-50 text-slate-600 hover:bg-blue-50 hover:text-blue-700 text-[10px] px-2 py-1 rounded-lg font-bold tracking-wide uppercase transition-colors"
