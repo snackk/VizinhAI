@@ -1767,6 +1767,8 @@
               const dateObj = new Date();
               const today = dateObj.toLocaleDateString('pt-PT');
               const condoName = condo?.name || 'Condomínio';
+              const admin = users.find(u => u.role === 'admin');
+              const adminName = admin?.name || 'A Administração';
 
               // Gerar PDF do Recibo semelhante à imagem
               let pdfBase64 = null;
@@ -1885,16 +1887,9 @@
                 message: {
                   subject: `Recibo de Pagamento - Quota ${monthName} ${year} - ${user.fraction}`,
                   html: `
-                    <p>O Condomínio ${condoName} comprova que a quota referente ao mês ${monthName} foi paga no dia ${today} para a fração ${user.fraction}.</p>
-                    <p>O presente email serve como recibo de pagamento.</p>
-                    <hr>
-                    <p><strong>Detalhes do Pagamento:</strong></p>
-                    <ul>
-                      <li><strong>Fração:</strong> ${user.fraction}</li>
-                      <li><strong>Mês de Referência:</strong> ${monthName} ${year}</li>
-                      <li><strong>Valor Pago:</strong> ${total.toFixed(2)} €</li>
-                      <li><strong>Data de Pagamento:</strong> ${today}</li>
-                    </ul>
+                    <p>Exmo. condómino<br>${user.name}</p>
+                    <p>Em anexo segue o seu recibo de pagamento referente ao condomínio ${condoName}.</p>
+                    <p>A administração do condomínio,<br>${adminName}</p>
                   `
                 }
               };
