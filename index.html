@@ -1735,49 +1735,55 @@
         const quotaId = `${userId}_${monthKey}`;
         const existing = quotas.find(q => q.firestoreId === quotaId);
 
+        if (existing) {
+          alert('Uma quota já paga não pode ser revertida, pois o recibo já foi enviado por e-mail.');
+          return;
+        }
+
+        const user = users.find(u => u.firestoreId === userId);
+        const [year, monthIdx] = monthKey.split('-').map(Number);
+        const monthName = t(`months.${monthIdx}`);
+
+        if (!confirm(`Tem a certeza que deseja marcar a quota de ${monthName} ${year} (${user.fraction}) como paga? Esta ação é irreversível e enviará um e-mail de recibo.`)) {
+          return;
+        }
+
         try {
-          if (existing) {
-            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quotas', quotaId));
-          } else {
-            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quotas', quotaId), {
-              userId,
-              monthKey,
-              status: 'paid',
-              updatedAt: new Date().toISOString()
+          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quotas', quotaId), {
+            userId,
+            monthKey,
+            status: 'paid',
+            updatedAt: new Date().toISOString()
+          });
+
+          // Enviar e-mail de recibo
+          if (user && user.email) {
+            const perm = parseFloat(user.permilagem) || 0;
+            const quotaBase = (monthlyTotal * (perm / 1000));
+            const reserveFund = quotaBase * (rfPerc / 100);
+            const total = quotaBase + reserveFund;
+            const dateObj = new Date();
+            const today = dateObj.toLocaleDateString('pt-PT');
+            const condoName = condo?.name || 'Condomínio';
+
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'mail'), {
+              to: user.email,
+              message: {
+                subject: `Recibo de Pagamento - Quota ${monthName} ${year} - ${user.fraction}`,
+                html: `
+                  <p>O Condomínio ${condoName} comprova que a quota referente ao mês ${monthName} foi paga no dia ${today} para a fração ${user.fraction}.</p>
+                  <p>O presente email serve como recibo de pagamento.</p>
+                  <hr>
+                  <p><strong>Detalhes do Pagamento:</strong></p>
+                  <ul>
+                    <li><strong>Fração:</strong> ${user.fraction}</li>
+                    <li><strong>Mês de Referência:</strong> ${monthName} ${year}</li>
+                    <li><strong>Valor Pago:</strong> ${total.toFixed(2)} €</li>
+                    <li><strong>Data de Pagamento:</strong> ${today}</li>
+                  </ul>
+                `
+              }
             });
-
-            // Enviar e-mail de recibo
-            const user = users.find(u => u.firestoreId === userId);
-            if (user && user.email) {
-              const perm = parseFloat(user.permilagem) || 0;
-              const quotaBase = (monthlyTotal * (perm / 1000));
-              const reserveFund = quotaBase * (rfPerc / 100);
-              const total = quotaBase + reserveFund;
-              const dateObj = new Date();
-              const [year, monthIdx] = monthKey.split('-').map(Number);
-              const monthName = t(`months.${monthIdx}`);
-              const today = dateObj.toLocaleDateString('pt-PT');
-              const condoName = condo?.name || 'Condomínio';
-
-              await addDoc(collection(db, 'artifacts', appId, 'public', 'mail'), {
-                to: user.email,
-                message: {
-                  subject: `Recibo de Pagamento - Quota ${monthName} ${year} - ${user.fraction}`,
-                  html: `
-                    <p>O Condomínio ${condoName} comprova que a quota referente ao mês ${monthName} foi paga no dia ${today} para a fração ${user.fraction}.</p>
-                    <p>O presente email serve como recibo de pagamento.</p>
-                    <hr>
-                    <p><strong>Detalhes do Pagamento:</strong></p>
-                    <ul>
-                      <li><strong>Fração:</strong> ${user.fraction}</li>
-                      <li><strong>Mês de Referência:</strong> ${monthName} ${year}</li>
-                      <li><strong>Valor Pago:</strong> ${total.toFixed(2)} €</li>
-                      <li><strong>Data de Pagamento:</strong> ${today}</li>
-                    </ul>
-                  `
-                }
-              });
-            }
           }
         } catch (err) {
           alert('Erro ao atualizar estado de pagamento: ' + err.message);
@@ -1823,8 +1829,8 @@
                           <td key={idx} className="px-4 py-4 text-center">
                             <button 
                               onClick={() => togglePaid(user.firestoreId, monthKey)}
-                              disabled={!isAdmin}
-                              className={`w-full p-2 rounded-xl transition-all border ${isPaid ? 'bg-green-50 border-green-100 text-green-700' : 'bg-white border-slate-100 text-slate-400 hover:border-blue-200'}`}
+                              disabled={!isAdmin || isPaid}
+                              className={`w-full p-2 rounded-xl transition-all border ${isPaid ? 'bg-green-50 border-green-100 text-green-700 cursor-not-allowed opacity-100' : 'bg-white border-slate-100 text-slate-400 hover:border-blue-200'}`}
                             >
                               {isPaid ? (
                                 <div className="flex flex-col items-center">
