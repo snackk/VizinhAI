@@ -184,7 +184,7 @@
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-slate-900 truncate">{currentUser?.name}</p>
-                  <p className="text-xs text-slate-500 truncate">{currentUser?.fraction} • {isAdmin ? 'Admin' : 'Condómino'}</p>
+                  <p className="text-xs text-slate-500 truncate">{currentUser?.fraction} ({currentUser?.permilagem || 0}‰) • {isAdmin ? 'Admin' : 'Condómino'}</p>
                 </div>
               </div>
               <button onClick={handleLogout} className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium text-red-600 rounded-xl hover:bg-red-50 transition-colors">
@@ -342,17 +342,24 @@
     }
 
     function CondoPage({ condo, isAdmin, db, appId }) {
-      const [isEditing, setIsEditing] = useState(false);
-      const [formData, setFormData] = useState(condo || {});
+      const [isEditing, setIsEditing] = useState(!condo);
+      const [formData, setFormData] = useState(condo || { name: '', address: '', nif: '', iban: '' });
       const [saving, setSaving] = useState(false);
 
-      useEffect(() => { if (condo) setFormData(condo); }, [condo]);
+      useEffect(() => { 
+        if (condo) {
+          setFormData(condo);
+          setIsEditing(false);
+        } else if (isAdmin) {
+          setIsEditing(true);
+        }
+      }, [condo, isAdmin]);
 
       const handleSave = async (e) => {
         e.preventDefault();
         setSaving(true);
         try {
-          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'condo', 'info'), formData);
+          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'condo', 'info'), formData);
           setIsEditing(false);
         } catch (err) {
           alert('Erro ao guardar: ' + err.message);
@@ -361,6 +368,7 @@
         }
       };
 
+      if (!condo && !isAdmin) return <div className="p-8 text-center bg-white rounded-3xl border border-slate-100 shadow-sm"><AlertCircle className="w-12 h-12 text-orange-400 mx-auto mb-4" /> <p className="text-slate-600 font-medium">Os dados do condomínio ainda não foram configurados pelo administrador.</p></div>;
       if (!condo && !isEditing) return <div className="p-8 text-center">A carregar dados do condomínio...</div>;
 
       return (
@@ -457,6 +465,7 @@
       const [newName, setNewName] = useState('');
       const [newEmail, setNewEmail] = useState('');
       const [newFraction, setNewFraction] = useState('');
+      const [newPermilagem, setNewPermilagem] = useState('');
       const [msg, setMsg] = useState({ type: '', text: '' });
       const [loading, setLoading] = useState(false);
 
@@ -470,13 +479,19 @@
           const userCred = await createUserWithEmailAndPassword(secondaryAuth, newEmail, tempPassword);
 
           await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userCred.user.uid), {
-            id: userCred.user.uid, name: newName, email: newEmail, fraction: newFraction, role: 'user', condoId: appId
+            id: userCred.user.uid, 
+            name: newName, 
+            email: newEmail, 
+            fraction: newFraction, 
+            permilagem: parseFloat(newPermilagem) || 0,
+            role: 'user', 
+            condoId: appId
           });
           await sendPasswordResetEmail(auth, newEmail);
           await signOut(secondaryAuth);
           
           setMsg({ type: 'success', text: 'Condómino adicionado!' });
-          setNewName(''); setNewEmail(''); setNewFraction('');
+          setNewName(''); setNewEmail(''); setNewFraction(''); setNewPermilagem('');
           setTimeout(() => setShowForm(false), 3000);
         } catch (err) {
           setMsg({ type: 'error', text: 'Erro: ' + err.message });
@@ -506,10 +521,11 @@
             <form onSubmit={handleCreateUser} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
               <h3 className="font-semibold mb-5 text-lg">Novo Condómino</h3>
               {msg.text && <div className={`mb-5 p-4 rounded-xl text-sm font-medium ${msg.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{msg.text}</div>}
-              <div className="grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <input required type="text" placeholder="Nome completo" value={newName} onChange={e => setNewName(e.target.value)} className="px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
                 <input required type="email" placeholder="E-mail" value={newEmail} onChange={e => setNewEmail(e.target.value)} className="px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
                 <input required type="text" placeholder="Fração (Ex: 1º Esq)" value={newFraction} onChange={e => setNewFraction(e.target.value)} className="px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
+                <input required type="number" step="0.01" placeholder="Permilagem (Ex: 15.5)" value={newPermilagem} onChange={e => setNewPermilagem(e.target.value)} className="px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <button type="submit" disabled={loading} className="mt-5 w-full bg-slate-900 text-white px-6 py-4 rounded-xl font-semibold disabled:opacity-50">
                 {loading ? 'A guardar...' : 'Guardar Condómino'}
@@ -524,6 +540,7 @@
                   <div>
                     <h3 className="font-bold text-xl tracking-tight">{frac.fraction}</h3>
                     <p className="text-slate-500 text-[15px] mt-1">{frac.name}</p>
+                    <p className="text-slate-400 text-xs mt-1 font-medium">Permilagem: {frac.permilagem || 0} ‰</p>
                   </div>
                   {frac.role === 'admin' && <span className="bg-blue-50 text-blue-700 text-xs px-2.5 py-1.5 rounded-lg font-bold tracking-wide uppercase">Admin</span>}
                 </div>
