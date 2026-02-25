@@ -15,6 +15,7 @@
   <link rel="apple-touch-icon" href="https://via.placeholder.com/192/2563eb/ffffff?text=V">
 
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   
@@ -1767,7 +1768,72 @@
               const today = dateObj.toLocaleDateString('pt-PT');
               const condoName = condo?.name || 'Condomínio';
 
-              await addDoc(collection(db, 'mail'), {
+              // Gerar PDF do Recibo
+              let pdfBase64 = null;
+              try {
+                const { jsPDF } = window.jspdf;
+                const docPdf = new jsPDF();
+                
+                // Cabeçalho - Dados do Condomínio (Esquerda)
+                docPdf.setFontSize(10);
+                docPdf.setTextColor(100);
+                docPdf.text(condoName, 20, 20);
+                docPdf.text(`NIF: ${condo?.nif || 'N/A'}`, 20, 25);
+                docPdf.text(condo?.address || 'N/A', 20, 30);
+                
+                // Cabeçalho - Dados do Condómino (Direita)
+                docPdf.textAlign = 'right';
+                docPdf.text(user.name, 190, 20);
+                docPdf.text(`Fração: ${user.fraction}`, 190, 25);
+                docPdf.textAlign = 'left';
+
+                // Título
+                docPdf.setFontSize(18);
+                docPdf.setTextColor(0);
+                docPdf.text('RECIBO DE PAGAMENTO', 105, 50, { align: 'center' });
+                
+                // Corpo do PDF
+                docPdf.setFontSize(12);
+                docPdf.text(`Data de Emissão: ${today}`, 20, 70);
+                
+                docPdf.setDrawColor(200);
+                docPdf.line(20, 75, 190, 75);
+                
+                docPdf.text('Descrição', 20, 85);
+                docPdf.text('Valor', 160, 85);
+                
+                docPdf.line(20, 88, 190, 88);
+                
+                docPdf.setFontSize(11);
+                docPdf.text(`Quota do orçamento - ${monthName} ${year}`, 20, 98);
+                docPdf.text(`${quotaBase.toFixed(2)} €`, 160, 98);
+                
+                docPdf.text(`Quota do fundo comum de reserva (${rfPerc}%)`, 20, 106);
+                docPdf.text(`${reserveFund.toFixed(2)} €`, 160, 106);
+                
+                docPdf.line(20, 112, 190, 112);
+                
+                docPdf.setFont(undefined, 'bold');
+                docPdf.text('TOTAL PAGO', 20, 122);
+                docPdf.text(`${total.toFixed(2)} €`, 160, 122);
+                
+                docPdf.setFont(undefined, 'normal');
+                docPdf.setFontSize(10);
+                docPdf.text(`Fração: ${user.fraction}`, 20, 140);
+                docPdf.text(`Este documento comprova o pagamento da quota referente ao mês de ${monthName} de ${year}.`, 20, 148);
+                
+                // Rodapé
+                docPdf.setFontSize(8);
+                docPdf.setTextColor(150);
+                docPdf.text('Gerado automaticamente por VizinhAI', 105, 280, { align: 'center' });
+                
+                const pdfOutput = docPdf.output('datauristring');
+                pdfBase64 = pdfOutput.split(',')[1];
+              } catch (pdfErr) {
+                console.error("Erro ao gerar PDF:", pdfErr);
+              }
+
+              const mailData = {
                 to: user.email,
                 appId: appId,
                 message: {
@@ -1785,7 +1851,19 @@
                     </ul>
                   `
                 }
-              });
+              };
+
+              if (pdfBase64) {
+                mailData.message.attachments = [
+                  {
+                    filename: `Recibo_${user.fraction}_${monthName}_${year}.pdf`,
+                    content: pdfBase64,
+                    encoding: 'base64'
+                  }
+                ];
+              }
+
+              await addDoc(collection(db, 'mail'), mailData);
             }
           } catch (mailErr) {
             console.error("Erro ao enviar email:", mailErr);
