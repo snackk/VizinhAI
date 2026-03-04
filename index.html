@@ -556,14 +556,18 @@
           
           <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
             <header className="mobile-header bg-blue-600 text-white h-16 flex items-center justify-between px-4 lg:hidden shrink-0 shadow-md">
-              <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 -ml-2 text-white hover:bg-blue-700 rounded-full transition-colors"><Menu className="w-6 h-6" /></button>
+              <div className="w-10 flex justify-start">
+                <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 text-white hover:bg-blue-700 rounded-full transition-colors"><Menu className="w-6 h-6" /></button>
+              </div>
               <div className="flex flex-col items-center">
                 <span className="font-semibold text-lg tracking-wide">VizinhAI</span>
                 {condo && <span className="text-[10px] opacity-80 uppercase font-bold">{condo.name}</span>}
               </div>
-              {(isBackoffice || currentUser.condoIds?.length > 1) ? (
-                <button onClick={() => setSelectedCondoId(null)} className="p-2 text-white hover:bg-blue-700 rounded-full transition-colors"><Calendar className="w-5 h-5" /></button>
-              ) : <div className="w-10" />}
+              <div className="w-10 flex justify-end">
+                {(isBackoffice || currentUser.condoIds?.length > 1) ? (
+                    <button onClick={() => setSelectedCondoId(null)} className="p-2 text-white hover:bg-blue-700 rounded-full transition-colors"><Calendar className="w-5 h-5" /></button>
+                ) : null}
+              </div>
             </header>
 
             <div className="flex-1 overflow-y-auto p-4 md:p-8 safe-pb bg-slate-50/50">
