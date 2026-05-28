@@ -2894,31 +2894,110 @@
             const user = users.find(u => u.firestoreId === userId);
             if (!user || !user.email) continue;
 
+            // Generate Procuração PDF
+            let pdfBase64 = null;
+            try {
+              const { jsPDF } = window.jspdf;
+              const pdfDoc = new jsPDF();
+              const pageWidth = pdfDoc.internal.pageSize.getWidth();
+              let y = 20;
+
+              pdfDoc.setFontSize(11);
+              pdfDoc.text(user.name || '', 14, y); y += 8;
+              pdfDoc.setFontSize(10);
+              pdfDoc.text(condoName, 14, y); y += 5;
+              pdfDoc.text(condoAddress, 14, y); y += 12;
+
+              pdfDoc.setFontSize(16);
+              pdfDoc.setFont(undefined, 'bold');
+              pdfDoc.text('PROCURAÇÃO', pageWidth / 2, y, { align: 'center' }); y += 12;
+
+              pdfDoc.setFontSize(10);
+              pdfDoc.setFont(undefined, 'normal');
+              pdfDoc.text(condoAddress, 14, y); y += 10;
+
+              const procText = `Eu, ${user.name}, constituo meu bastante procurador:`;
+              pdfDoc.text(procText, 14, y); y += 8;
+
+              pdfDoc.text('Nome: _________________________________________________________________', 14, y); y += 7;
+              pdfDoc.text('Morada: ________________________________________________________________', 14, y); y += 7;
+              pdfDoc.text('Doc. Id.:  BI [  ]   /   CC [  ]   /   Passaporte [  ]', 14, y); y += 7;
+              pdfDoc.text('Nº: ____________________________________', 14, y); y += 10;
+
+              const poderText = `, a quem confiro os poderes de, em meu nome, deliberar e votar todas as propostas que forem apresentadas na reunião de assembleia de condóminos a realizar em ${condoAddress}, no dia ${dataExtenso} às ${hora}H, ou, alternativamente, no dia ${dataExtenso} às ${hora2a}H, incluindo poderes de substabelecimento, com as seguintes recomendações e/ou exceções:`;
+              const splitPoder = pdfDoc.splitTextToSize(poderText, pageWidth - 28);
+              pdfDoc.text(splitPoder, 14, y); y += splitPoder.length * 5 + 10;
+
+              // Fractions table
+              pdfDoc.setFont(undefined, 'bold');
+              pdfDoc.text('Frações de que sou titular:', 14, y); y += 7;
+              pdfDoc.setFont(undefined, 'normal');
+
+              // Table header
+              pdfDoc.setFillColor(240, 240, 240);
+              pdfDoc.rect(14, y - 1, pageWidth - 28, 7, 'F');
+              pdfDoc.text('Permilagem', 16, y + 4);
+              pdfDoc.text('Fração', 70, y + 4);
+              pdfDoc.text('Nº Votos', 130, y + 4);
+              y += 9;
+
+              // Table row
+              pdfDoc.text(user.permilagem ? String(user.permilagem) + '‰' : '', 16, y + 4);
+              pdfDoc.text(user.fraction || '', 70, y + 4);
+              pdfDoc.text('1', 130, y + 4);
+              y += 9;
+
+              pdfDoc.line(14, y, pageWidth - 14, y); y += 12;
+
+              pdfDoc.text('Data: ____ / ____ / ________', 14, y); y += 10;
+              pdfDoc.text('Assinatura: ______________________________________________________________', 14, y); y += 14;
+
+              pdfDoc.setFontSize(8);
+              pdfDoc.setFont(undefined, 'italic');
+              const nota = 'NOTA: Esta procuração deverá ser devidamente preenchida, assinada e remetida ou entregue à Administração do Condomínio.';
+              pdfDoc.text(nota, 14, y);
+
+              pdfBase64 = pdfDoc.output('datauristring').split(',')[1];
+            } catch (pdfErr) {
+              console.error("Erro ao gerar PDF procuração:", pdfErr);
+            }
+
             const htmlBody = `
               <p><strong>${condoName}</strong></p>
               <br>
-              <p>Exmº(ª) Senhor(ª)<br><strong>${user.name}</strong></p>
+              <p>Exmº(ª) Senhor(ª)<br>${user.name}</p>
               <br>
-              <p>O Administrador do edifício em referência, <strong>${adminName}</strong>, nos termos e para os efeitos do que dispõem os artigos 1431º e 1432º do Código Civil, convocam Vª Exª para a <strong>Assembleia Geral${tipoLabel}</strong> a realizar no próximo dia <strong>${dataExtenso}</strong> pelas <strong>${hora}</strong> em <strong>${condoAddress}</strong>, com a seguinte ordem de trabalhos:</p>
+              <p>O Administrador do edifício em referência, <strong>${adminName}</strong>, nos termos e para os efeitos do que dispõem os artigos 1431º e 1432º do Código Civil, convocam Vª Exª para a <strong>Assembleia Geral${tipoLabel}</strong> a realizar no próximo dia <strong>${dataExtenso}</strong> pelas <strong>${hora}</strong>H em <strong>${condoAddress}</strong>, com a seguinte ordem de trabalhos:</p>
               <br>
               <p>${pontosHtml}</p>
               <br>
               <p><strong>Informação Legal (2.ª Convocatória):</strong></p>
-              <p>Se à hora marcada não se encontrar reunido o quórum legal necessário para deliberar, fica desde já convocada a Assembleia para reunir em segunda convocatória, no mesmo dia e local, às <strong>${hora2a}</strong>horas, deliberando a assembleia com os condóminos presentes, desde que estes representem, pelo menos, um quarto do valor total do prédio, conforme o n.º 4 do Artigo 1432.º do Código Civil.</p>
+              <p>Se à hora marcada não se encontrar reunido o quórum legal necessário para deliberar, fica desde já convocada a Assembleia para reunir em segunda convocatória, no mesmo dia e local, às <strong>${hora2a}</strong>H, deliberando a assembleia com os condóminos presentes, desde que estes representem, pelo menos, um quarto do valor total do prédio, conforme o n.º 4 do Artigo 1432.º do Código Civil.</p>
               <br>
               <p>Caso não possa estar presente, poderá fazer-se representar por outra pessoa, desde que esta se faça acompanhar da respetiva procuração.</p>
               <br>
               <p>Com os melhores cumprimentos,<br><strong>${adminName}</strong></p>
             `;
 
-            await addDoc(collection(db, 'mail'), {
+            const fractionLabel = (user.fraction || 'X').replace(/\s+/g, '-');
+            const mailData = {
               to: user.email,
               condoId: selectedCondoId,
               message: {
                 subject: `Convocatória - Assembleia Geral${tipoLabel} nº ${numero} - ${condoName}`,
                 html: htmlBody
               }
-            });
+            };
+
+            if (pdfBase64) {
+              mailData.message.attachments = [{
+                filename: `${fractionLabel}_PROCURACAO.pdf`,
+                content: pdfBase64,
+                encoding: 'base64'
+              }];
+            }
+
+            await addDoc(collection(db, 'mail'), mailData);
           }
 
           alert(t('assembleiaCreated'));
