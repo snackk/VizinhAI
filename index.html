@@ -2811,6 +2811,7 @@
       const [tipo, setTipo] = useState('geral');
       const [pontos, setPontos] = useState(['']);
       const [convidados, setConvidados] = useState([]);
+      const [convidadosOpen, setConvidadosOpen] = useState(false);
 
       useEffect(() => {
         if (!selectedCondoId) return;
@@ -3002,6 +3003,7 @@
 
           alert(t('assembleiaCreated'));
           setShowForm(false);
+          setConvidadosOpen(false);
           setNumero(''); setData(''); setHora(''); setTipo('geral'); setPontos(['']); setConvidados([]);
         } catch (err) {
           console.error("Erro ao criar assembleia:", err);
@@ -3020,7 +3022,7 @@
               <h2 className="text-[26px] font-bold text-slate-800 tracking-tight">{t('assembleias')}</h2>
               <p className="text-slate-500 text-sm mt-1">{t('assembleiasDesc')}</p>
             </div>
-            <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2 bg-blue-600 text-white px-5 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20">
+            <button onClick={() => { setShowForm(!showForm); if (!showForm) setConvidados(users.map(u => u.firestoreId)); }} className="flex items-center gap-2 bg-blue-600 text-white px-5 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20">
               <Plus className="w-5 h-5" /> {t('novaAssembleia')}
             </button>
           </div>
@@ -3077,26 +3079,49 @@
                 </button>
               </div>
 
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-semibold text-slate-600 mb-2">{t('convidados')}</label>
-                <div className="mb-2">
-                  <button type="button" onClick={selectAllConvidados} className="text-xs text-blue-600 font-semibold hover:underline">
-                    {convidados.length === users.length ? 'Desselecionar Todos' : 'Selecionar Todos'}
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-48 overflow-y-auto border border-slate-100 rounded-xl p-3">
-                  {users.map(user => (
-                    <label key={user.firestoreId} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={convidados.includes(user.firestoreId)}
-                        onChange={() => toggleConvidado(user.firestoreId)}
-                        className="w-4 h-4 rounded text-blue-600"
-                      />
-                      <span className="text-sm text-slate-700">{user.name} {user.fraction ? `(${user.fraction})` : ''}</span>
-                    </label>
-                  ))}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setConvidadosOpen(!convidadosOpen)}
+                  className="w-full flex items-center justify-between px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 text-left outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                >
+                  <span className="text-sm text-slate-700 truncate">
+                    {convidados.length === users.length
+                      ? `Todos selecionados (${users.length})`
+                      : convidados.length === 0
+                        ? 'Nenhum selecionado'
+                        : `${convidados.length} de ${users.length} selecionados`}
+                  </span>
+                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${convidadosOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {convidadosOpen && (
+                  <div className="absolute z-20 mt-2 w-full bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('convidados')}</span>
+                      <button type="button" onClick={selectAllConvidados} className="text-xs text-blue-600 font-semibold hover:underline">
+                        {convidados.length === users.length ? 'Desselecionar Todos' : 'Selecionar Todos'}
+                      </button>
+                    </div>
+                    <div className="max-h-52 overflow-y-auto divide-y divide-slate-50">
+                      {users.map(user => (
+                        <label key={user.firestoreId} className="flex items-center gap-3 px-4 py-3 hover:bg-blue-50 cursor-pointer transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={convidados.includes(user.firestoreId)}
+                            onChange={() => toggleConvidado(user.firestoreId)}
+                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-slate-800 truncate">{user.name}</p>
+                            {user.fraction && <p className="text-xs text-slate-400">{user.fraction}</p>}
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-3">
