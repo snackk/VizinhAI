@@ -152,7 +152,22 @@
         mailAll: "Todos",
         mailSuccess: "Sucesso",
         mailError: "Erro",
-        mailNoMails: "Nenhum e-mail encontrado."
+        mailNoMails: "Nenhum e-mail encontrado.",
+        assembleias: "Assembleias",
+        assembleiasDesc: "Gestão de assembleias de condomínio",
+        novaAssembleia: "Nova Assembleia",
+        numeroAssembleia: "Número da Assembleia",
+        dataAssembleia: "Data",
+        horaAssembleia: "Hora",
+        tipoAssembleia: "Tipo",
+        geral: "Geral",
+        extraordinaria: "Extraordinária",
+        pontosOrdem: "Pontos de Ordem",
+        adicionarPonto: "Adicionar Ponto",
+        convidados: "Convidados",
+        criarAssembleia: "Criar Assembleia",
+        assembleiaCreated: "Assembleia criada e convocatórias enviadas!",
+        nenhumaAssembleia: "Nenhuma assembleia agendada."
       },
       en: {
         dashboard: "Dashboard",
@@ -227,7 +242,22 @@
         mailAll: "All",
         mailSuccess: "Success",
         mailError: "Error",
-        mailNoMails: "No emails found."
+        mailNoMails: "No emails found.",
+        assembleias: "Assemblies",
+        assembleiasDesc: "Condo assembly management",
+        novaAssembleia: "New Assembly",
+        numeroAssembleia: "Assembly Number",
+        dataAssembleia: "Date",
+        horaAssembleia: "Time",
+        tipoAssembleia: "Type",
+        geral: "General",
+        extraordinaria: "Extraordinary",
+        pontosOrdem: "Agenda Items",
+        adicionarPonto: "Add Item",
+        convidados: "Invitees",
+        criarAssembleia: "Create Assembly",
+        assembleiaCreated: "Assembly created and invitations sent!",
+        nenhumaAssembleia: "No assemblies scheduled."
       },
       fr: {
         dashboard: "Tableau de bord",
@@ -487,6 +517,7 @@
           case 'fracoes': return <FractionsPage users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} budgets={budgets} currentUser={currentUser} t={t} selectedCondoId={effectiveCondoId} />;
           case 'definicoes': return <SettingsPage currentUser={currentUser} db={db} appId={appId} t={t} selectedCondoId={selectedCondoId} />;
           case 'mails': return (isAdmin || isBackoffice) ? <MailsPage db={db} t={t} selectedCondoId={effectiveCondoId} isBackoffice={isBackoffice} /> : null;
+          case 'assembleias': return isAdmin ? <AssembleiasPage db={db} t={t} selectedCondoId={effectiveCondoId} users={users} condo={condo} currentUser={currentUser} /> : null;
           case 'condos': return isBackoffice ? <CondosPage allCondos={allCondos} db={db} t={t} onFirstCreate={() => setSelectedCondoId(null)} /> : null;
           default: return <AdminDashboard />;
         }
@@ -528,6 +559,7 @@
                   {isAdmin && <NavItem icon={<TrendingUp />} label={t('currentAccount')} active={activeTab === 'conta-corrente'} onClick={() => { setActiveTab('conta-corrente'); setIsMobileMenuOpen(false); }} />}
                   <NavItem icon={<Users />} label={t('fractions')} active={activeTab === 'fracoes'} onClick={() => { setActiveTab('fracoes'); setIsMobileMenuOpen(false); }} />
                   {isAdmin && <NavItem icon={<Mail />} label={t('mails')} active={activeTab === 'mails'} onClick={() => { setActiveTab('mails'); setIsMobileMenuOpen(false); }} />}
+                  {isAdmin && <NavItem icon={<Calendar />} label={t('assembleias')} active={activeTab === 'assembleias'} onClick={() => { setActiveTab('assembleias'); setIsMobileMenuOpen(false); }} />}
                 </>
               )}
             </nav>
@@ -2761,6 +2793,303 @@
               {saving ? t('saving') : t('save')}
             </button>
           </form>
+        </div>
+      );
+    }
+
+    // --- ASSEMBLEIAS PAGE ---
+    function AssembleiasPage({ db, t, selectedCondoId, users, condo, currentUser }) {
+      const [assembleias, setAssembleias] = useState([]);
+      const [showForm, setShowForm] = useState(false);
+      const [expandedId, setExpandedId] = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [sending, setSending] = useState(false);
+
+      const [numero, setNumero] = useState('');
+      const [data, setData] = useState('');
+      const [hora, setHora] = useState('');
+      const [tipo, setTipo] = useState('geral');
+      const [pontos, setPontos] = useState(['']);
+      const [convidados, setConvidados] = useState([]);
+
+      useEffect(() => {
+        if (!selectedCondoId) return;
+        const col = collection(db, 'condos', selectedCondoId, 'assembleias');
+        const unsub = onSnapshot(col, (snap) => {
+          const items = snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }));
+          items.sort((a, b) => {
+            const dA = a.data ? new Date(a.data) : new Date(0);
+            const dB = b.data ? new Date(b.data) : new Date(0);
+            return dB - dA;
+          });
+          setAssembleias(items);
+          setLoading(false);
+        });
+        return () => unsub();
+      }, [selectedCondoId]);
+
+      const addPonto = () => setPontos([...pontos, '']);
+      const removePonto = (idx) => setPontos(pontos.filter((_, i) => i !== idx));
+      const updatePonto = (idx, val) => { const copy = [...pontos]; copy[idx] = val; setPontos(copy); };
+
+      const toggleConvidado = (userId) => {
+        setConvidados(prev => prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]);
+      };
+
+      const selectAllConvidados = () => {
+        if (convidados.length === users.length) {
+          setConvidados([]);
+        } else {
+          setConvidados(users.map(u => u.firestoreId));
+        }
+      };
+
+      const formatDateExtended = (dateStr) => {
+        const d = new Date(dateStr);
+        const meses = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+        return `${d.getDate()} de ${meses[d.getMonth()]} de ${d.getFullYear()}`;
+      };
+
+      const addMinutes = (timeStr, mins) => {
+        const [h, m] = timeStr.split(':').map(Number);
+        const total = h * 60 + m + mins;
+        const nh = Math.floor(total / 60) % 24;
+        const nm = total % 60;
+        return `${String(nh).padStart(2,'0')}:${String(nm).padStart(2,'0')}`;
+      };
+
+      const handleCreate = async (e) => {
+        e.preventDefault();
+        if (!numero || !data || !hora || pontos.filter(p => p.trim()).length === 0 || convidados.length === 0) {
+          alert('Preencha todos os campos obrigatórios.');
+          return;
+        }
+        setSending(true);
+        try {
+          const pontosLimpos = pontos.filter(p => p.trim());
+          const assembleiaData = {
+            numero,
+            data,
+            hora,
+            tipo,
+            pontos: pontosLimpos,
+            convidados,
+            createdAt: new Date().toISOString()
+          };
+
+          await addDoc(collection(db, 'condos', selectedCondoId, 'assembleias'), assembleiaData);
+
+          // Send emails to each invited member
+          const adminUser = users.find(u => u.role === 'admin') || currentUser;
+          const adminName = adminUser?.name || 'A Administração';
+          const condoName = condo?.name || '';
+          const condoAddress = condo?.address || '';
+          const tipoLabel = tipo === 'extraordinaria' ? ' Extraordinária' : '';
+          const dataExtenso = formatDateExtended(data);
+          const hora2a = addMinutes(hora, 30);
+
+          const pontosHtml = pontosLimpos.map((p, i) => `${i + 1}. ${p}`).join('<br>');
+
+          for (const userId of convidados) {
+            const user = users.find(u => u.firestoreId === userId);
+            if (!user || !user.email) continue;
+
+            const htmlBody = `
+              <p><strong>${condoName}</strong></p>
+              <br>
+              <p>Exmº(ª) Senhor(ª)<br><strong>${user.name}</strong></p>
+              <br>
+              <p>O Administrador do edifício em referência, <strong>${adminName}</strong>, nos termos e para os efeitos do que dispõem os artigos 1431º e 1432º do Código Civil, convocam Vª Exª para a <strong>Assembleia Geral${tipoLabel}</strong> a realizar no próximo dia <strong>${dataExtenso}</strong> pelas <strong>${hora}</strong> em <strong>${condoAddress}</strong>, com a seguinte ordem de trabalhos:</p>
+              <br>
+              <p>${pontosHtml}</p>
+              <br>
+              <p><strong>Informação Legal (2.ª Convocatória):</strong></p>
+              <p>Se à hora marcada não se encontrar reunido o quórum legal necessário para deliberar, fica desde já convocada a Assembleia para reunir em segunda convocatória, no mesmo dia e local, às <strong>${hora2a}</strong>horas, deliberando a assembleia com os condóminos presentes, desde que estes representem, pelo menos, um quarto do valor total do prédio, conforme o n.º 4 do Artigo 1432.º do Código Civil.</p>
+              <br>
+              <p>Caso não possa estar presente, poderá fazer-se representar por outra pessoa, desde que esta se faça acompanhar da respetiva procuração.</p>
+              <br>
+              <p>Com os melhores cumprimentos,<br><strong>${adminName}</strong></p>
+            `;
+
+            await addDoc(collection(db, 'mail'), {
+              to: user.email,
+              condoId: selectedCondoId,
+              message: {
+                subject: `Convocatória - Assembleia Geral${tipoLabel} nº ${numero} - ${condoName}`,
+                html: htmlBody
+              }
+            });
+          }
+
+          alert(t('assembleiaCreated'));
+          setShowForm(false);
+          setNumero(''); setData(''); setHora(''); setTipo('geral'); setPontos(['']); setConvidados([]);
+        } catch (err) {
+          console.error("Erro ao criar assembleia:", err);
+          alert('Erro ao criar assembleia: ' + err.message);
+        } finally {
+          setSending(false);
+        }
+      };
+
+      const getTipoLabel = (tipo) => tipo === 'extraordinaria' ? t('extraordinaria') : t('geral');
+
+      return (
+        <div className="space-y-6">
+          <div className="pt-2 flex justify-between items-center">
+            <div>
+              <h2 className="text-[26px] font-bold text-slate-800 tracking-tight">{t('assembleias')}</h2>
+              <p className="text-slate-500 text-sm mt-1">{t('assembleiasDesc')}</p>
+            </div>
+            <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2 bg-blue-600 text-white px-5 py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20">
+              <Plus className="w-5 h-5" /> {t('novaAssembleia')}
+            </button>
+          </div>
+
+          {showForm && (
+            <form onSubmit={handleCreate} className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1">{t('numeroAssembleia')}</label>
+                  <input type="text" value={numero} onChange={e => setNumero(e.target.value)} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1">{t('dataAssembleia')}</label>
+                  <input type="date" value={data} onChange={e => setData(e.target.value)} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1">{t('horaAssembleia')}</label>
+                  <input type="time" value={hora} onChange={e => setHora(e.target.value)} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500" required />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-600 mb-1">{t('tipoAssembleia')}</label>
+                <select value={tipo} onChange={e => setTipo(e.target.value)} className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="geral">{t('geral')}</option>
+                  <option value="extraordinaria">{t('extraordinaria')}</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-600 mb-2">{t('pontosOrdem')}</label>
+                <div className="space-y-2">
+                  {pontos.map((ponto, idx) => (
+                    <div key={idx} className="flex gap-2 items-center">
+                      <span className="text-sm font-bold text-slate-400 w-6">{idx + 1}.</span>
+                      <input
+                        type="text"
+                        value={ponto}
+                        onChange={e => updatePonto(idx, e.target.value)}
+                        className="flex-1 px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder={`Ponto ${idx + 1}...`}
+                        required
+                      />
+                      {pontos.length > 1 && (
+                        <button type="button" onClick={() => removePonto(idx)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button type="button" onClick={addPonto} className="mt-2 flex items-center gap-1 text-sm text-blue-600 font-semibold hover:text-blue-700">
+                  <Plus className="w-4 h-4" /> {t('adicionarPonto')}
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-600 mb-2">{t('convidados')}</label>
+                <div className="mb-2">
+                  <button type="button" onClick={selectAllConvidados} className="text-xs text-blue-600 font-semibold hover:underline">
+                    {convidados.length === users.length ? 'Desselecionar Todos' : 'Selecionar Todos'}
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-48 overflow-y-auto border border-slate-100 rounded-xl p-3">
+                  {users.map(user => (
+                    <label key={user.firestoreId} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={convidados.includes(user.firestoreId)}
+                        onChange={() => toggleConvidado(user.firestoreId)}
+                        className="w-4 h-4 rounded text-blue-600"
+                      />
+                      <span className="text-sm text-slate-700">{user.name} {user.fraction ? `(${user.fraction})` : ''}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button type="submit" disabled={sending} className="flex-1 bg-blue-600 text-white px-6 py-4 rounded-xl font-semibold disabled:opacity-50 hover:bg-blue-700 transition-colors">
+                  {sending ? 'A enviar...' : t('criarAssembleia')}
+                </button>
+                <button type="button" onClick={() => setShowForm(false)} className="px-6 py-4 border border-slate-200 rounded-xl font-semibold hover:bg-slate-50">Cancelar</button>
+              </div>
+            </form>
+          )}
+
+          {loading ? (
+            <div className="text-center py-12 text-slate-400">A carregar...</div>
+          ) : assembleias.length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-3xl border border-slate-100 shadow-sm">
+              <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500">{t('nenhumaAssembleia')}</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {assembleias.map(a => {
+                const isExpanded = expandedId === a.firestoreId;
+                const dateObj = a.data ? new Date(a.data) : null;
+                const dateFormatted = dateObj ? dateObj.toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' }) : '';
+                return (
+                  <div key={a.firestoreId} className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+                    <button
+                      onClick={() => setExpandedId(isExpanded ? null : a.firestoreId)}
+                      className="w-full flex items-center justify-between p-5 text-left hover:bg-slate-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 rounded-2xl bg-blue-100 text-blue-600">
+                          <Calendar className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-slate-800">Assembleia nº {a.numero}</h3>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${a.tipo === 'extraordinaria' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
+                              {getTipoLabel(a.tipo)}
+                            </span>
+                          </div>
+                          <p className="text-sm text-slate-500 mt-0.5">{dateFormatted} {a.hora ? `às ${a.hora}` : ''}</p>
+                        </div>
+                      </div>
+                      {isExpanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+                    </button>
+                    {isExpanded && (
+                      <div className="px-5 pb-5 border-t border-slate-100 pt-4">
+                        <h4 className="text-sm font-semibold text-slate-600 mb-2">Ordem de Trabalhos:</h4>
+                        <ol className="list-decimal pl-5 space-y-1">
+                          {(a.pontos || []).map((p, i) => (
+                            <li key={i} className="text-sm text-slate-700">{p}</li>
+                          ))}
+                        </ol>
+                        {a.convidados && (
+                          <div className="mt-4">
+                            <h4 className="text-sm font-semibold text-slate-600 mb-1">Convidados ({a.convidados.length}):</h4>
+                            <div className="flex flex-wrap gap-1">
+                              {a.convidados.map(cId => {
+                                const u = users.find(u => u.firestoreId === cId);
+                                return u ? <span key={cId} className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full">{u.name}</span> : null;
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       );
     }
