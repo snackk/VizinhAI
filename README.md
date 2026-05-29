@@ -3,11 +3,110 @@
 A lightweight, mobile-first Progressive Web App (PWA) built with React and Firebase to simplify condominium management. VizinhAI allows administrators and residents to easily track quotas, approve expenses, share documents, and manage building fractions in a centralized, secure environment.
 
 ## ✨ Features
-* **Role-Based Access:** Distinct views and capabilities for Administrators and Residents.
-* **Financial Tracking:** Monitor pending/paid quotas, annual budgets, and pending expenses.
+* **Role-Based Access:** Distinct views and capabilities for Backoffice, Administrators, and Residents.
+* **Multi-Condo Support:** Backoffice users can manage multiple condominiums from a single dashboard.
+* **Financial Tracking:** Monitor pending/paid quotas, annual budgets, and expenses with automated receipt PDF generation.
 * **Document Hub:** Securely upload and access building documents like meeting minutes, invoices, and contracts.
+* **Assembly Management:** Schedule assemblies, send convocations with procuration PDFs via email.
+* **Email History:** Track all system-sent emails with status and attachment downloads.
+* **Multi-Language:** Supports Portuguese, English, and French (react-i18next).
 * **PWA Ready:** Installable on iOS (via Safari) and Android directly to the home screen for a native app experience.
 * **Serverless Backend:** Powered completely by Firebase Authentication, Firestore, and Firebase Storage.
+
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Build Tool | [Vite](https://vitejs.dev/) |
+| UI | [React 18](https://react.dev/) (JavaScript) |
+| Styling | [Tailwind CSS v4](https://tailwindcss.com/) via `@tailwindcss/vite` |
+| Backend | [Firebase 10](https://firebase.google.com/) (Auth, Firestore, Storage) |
+| Icons | [Lucide React](https://lucide.dev/) |
+| PDF | [jsPDF](https://github.com/parallax/jsPDF) |
+| i18n | [react-i18next](https://react.i18next.com/) + [i18next](https://www.i18next.com/) |
+
+## 📁 Project Structure
+
+```
+src/
+├── main.jsx                    # Entry point: ReactDOM.createRoot
+├── App.jsx                     # Root component (auth, condo selection, routing, sidebar)
+├── index.css                   # Tailwind directives + custom styles
+├── config/
+│   └── firebase.js             # Firebase init (reads VITE_FIREBASE_CONFIG env var)
+├── i18n/
+│   ├── index.js                # i18next setup
+│   └── locales/
+│       ├── pt.json
+│       ├── en.json
+│       └── fr.json
+├── components/
+│   ├── NavItem.jsx
+│   ├── StatCard.jsx
+│   ├── AnnualQuotasTable.jsx
+│   ├── LoginScreen.jsx
+│   └── CondoSelectionScreen.jsx
+└── pages/
+    ├── AdminDashboard.jsx
+    ├── UserDashboard.jsx
+    ├── CondoPage.jsx
+    ├── DocumentsPage.jsx
+    ├── ExpensesPage.jsx
+    ├── BudgetsPage.jsx
+    ├── CurrentAccountPage.jsx
+    ├── FractionsPage.jsx
+    ├── SettingsPage.jsx
+    ├── MailsPage.jsx
+    ├── AssembleiasPage.jsx
+    └── CondosPage.jsx
+public/
+├── logo.png
+├── manifest.json
+└── CNAME
+```
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 20+ and npm
+
+### Installation
+
+```bash
+npm install
+```
+
+### Development
+
+Create a `.env.local` file with your Firebase config:
+
+```env
+VITE_FIREBASE_CONFIG='{"apiKey":"...","authDomain":"...","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}'
+```
+
+Then run:
+
+```bash
+npm run dev
+```
+
+### Production Build
+
+```bash
+npm run build
+```
+
+The output is in `dist/` — deploy to GitHub Pages or any static host.
+
+### Deployment (GitHub Pages)
+
+The project is deployed to `vizinhai.snackk-media.com` via GitHub Actions. The workflow:
+
+1. Sets `VITE_FIREBASE_CONFIG` from a GitHub Actions secret
+2. Runs `npm run build`
+3. Deploys `dist/` to GitHub Pages
+
+The `CNAME` file in `public/` ensures the custom domain is preserved across deploys.
 
 ## 🔐 Firebase Security Rules
 
