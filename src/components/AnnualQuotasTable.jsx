@@ -10,7 +10,7 @@ function AnnualQuotasTable({ currentBudget, users }) {
   let grandTotalRF = 0;
   let grandTotal = 0;
 
-  const rows = users.map(user => {
+  const rows = [...users].sort((a, b) => (a.fraction || '').localeCompare(b.fraction || '', 'pt')).map(user => {
     const perm = parseFloat(user.permilagem) || 0;
     const annualQuota = (totalBudget * (perm / 1000));
     const annualRF = annualQuota * (rfPerc / 100);

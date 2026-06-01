@@ -57,6 +57,7 @@ function App() {
   const [budgets, setBudgets] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [docTypes, setDocTypes] = useState([]);
+  const [assembleias, setAssembleias] = useState([]);
   const [condo, setCondo] = useState(null);
 
   useEffect(() => {
@@ -115,7 +116,7 @@ function App() {
 
   useEffect(() => {
     if (!firebaseUser || !selectedCondoId) {
-      setUsers([]); setQuotas([]); setExpenses([]); setBudgets([]); setDocuments([]); setDocTypes([]); setCondo(null);
+      setUsers([]); setQuotas([]); setExpenses([]); setBudgets([]); setDocuments([]); setDocTypes([]); setAssembleias([]); setCondo(null);
       return;
     }
 
@@ -127,6 +128,7 @@ function App() {
     const unsubBudgets = onSnapshot(getCol('budgets'), (snap) => setBudgets(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))), (err) => console.error("Erro budgets:", err));
     const unsubDocs = onSnapshot(getCol('documents'), (snap) => setDocuments(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))), (err) => console.error("Erro docs:", err));
     const unsubDocTypes = onSnapshot(getCol('docTypes'), (snap) => setDocTypes(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))), (err) => console.error("Erro docTypes:", err));
+    const unsubAssembleias = onSnapshot(getCol('assembleias'), (snap) => setAssembleias(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))), (err) => console.error("Erro assembleias:", err));
     const unsubCondo = onSnapshot(doc(db, 'condos', selectedCondoId), (docSnap) => {
       if (docSnap.exists()) {
         setCondo({ firestoreId: docSnap.id, ...docSnap.data() });
@@ -140,7 +142,7 @@ function App() {
       }
     }, (err) => console.error("Erro userInCondo:", err));
 
-    return () => { unsubUsers(); unsubQuotas(); unsubExpenses(); unsubBudgets(); unsubDocs(); unsubDocTypes(); unsubCondo(); unsubUserInCondo(); };
+    return () => { unsubUsers(); unsubQuotas(); unsubExpenses(); unsubBudgets(); unsubDocs(); unsubDocTypes(); unsubAssembleias(); unsubCondo(); unsubUserInCondo(); };
   }, [firebaseUser, selectedCondoId]);
 
   const handleLogout = () => signOut(auth);
@@ -182,7 +184,7 @@ function App() {
     }
 
     switch (activeTab) {
-      case 'dashboard': return isAdmin ? <AdminDashboard expenses={expenses} quotas={quotas} users={users} budgets={budgets} t={t} /> : <UserDashboard user={currentUser} quotas={quotas} expenses={expenses} budgets={budgets} users={users} t={t} />;
+      case 'dashboard': return isAdmin ? <AdminDashboard expenses={expenses} quotas={quotas} users={users} budgets={budgets} assembleias={assembleias} t={t} /> : <UserDashboard user={currentUser} quotas={quotas} expenses={expenses} budgets={budgets} users={users} assembleias={assembleias} t={t} />;
       case 'condo': return <CondoPage condo={condo} isAdmin={isAdmin} db={db} appId={appId} users={users} t={t} selectedCondoId={effectiveCondoId} />;
       case 'documentos': return <DocumentsPage documents={documents} docTypes={docTypes} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} storage={storage} selectedCondoId={effectiveCondoId} />;
       case 'despesas': return <ExpensesPage expenses={expenses} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} selectedCondoId={effectiveCondoId} />;
@@ -193,7 +195,7 @@ function App() {
       case 'mails': return (isAdmin || isBackoffice) ? <MailsPage db={db} t={t} selectedCondoId={effectiveCondoId} isBackoffice={isBackoffice} /> : null;
       case 'assembleias': return isAdmin ? <AssembleiasPage db={db} t={t} selectedCondoId={effectiveCondoId} users={users} condo={condo} currentUser={currentUser} /> : null;
       case 'condos': return isBackoffice ? <CondosPage allCondos={allCondos} db={db} t={t} onFirstCreate={() => setSelectedCondoId(null)} /> : null;
-      default: return isAdmin ? <AdminDashboard expenses={expenses} quotas={quotas} users={users} budgets={budgets} t={t} /> : null;
+      default: return isAdmin ? <AdminDashboard expenses={expenses} quotas={quotas} users={users} budgets={budgets} assembleias={assembleias} t={t} /> : null;
     }
   };
 

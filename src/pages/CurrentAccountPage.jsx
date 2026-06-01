@@ -27,7 +27,7 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
     return months;
   };
 
-  const months = getMonths(currentBudget.startDate, currentBudget.endDate).reverse();
+  const months = getMonths(currentBudget.startDate, currentBudget.endDate);
   const rfPerc = currentBudget.reserveFundPercentage ?? 10;
   const monthlyTotal = currentBudget.totalAmount / 12;
 

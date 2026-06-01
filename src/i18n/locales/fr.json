@@ -71,6 +71,7 @@
   "mailAll": "Tous",
   "mailSuccess": "Succès",
   "mailError": "Erreur",
-  "mailNoMails": "Aucun e-mail trouvé."
+  "mailNoMails": "Aucun e-mail trouvé.",
+  "upcomingAssemblies": "Prochaines Assemblées"
 }
 

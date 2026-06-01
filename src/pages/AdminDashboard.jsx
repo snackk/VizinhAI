@@ -1,9 +1,9 @@
 import React from 'react';
-import { TrendingUp, AlertCircle } from 'lucide-react';
+import { TrendingUp, AlertCircle, Calendar } from 'lucide-react';
 import StatCard from '../components/StatCard.jsx';
 import AnnualQuotasTable from '../components/AnnualQuotasTable.jsx';
 
-function AdminDashboard({ expenses, quotas, users, budgets, t }) {
+function AdminDashboard({ expenses, quotas, users, budgets, assembleias, t }) {
   const sortedBudgets = [...budgets].sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
   const currentBudget = sortedBudgets[0];
   const rfPerc = currentBudget?.reserveFundPercentage ?? 10;
@@ -57,6 +57,37 @@ function AdminDashboard({ expenses, quotas, users, budgets, t }) {
         <StatCard title={t('collectedFund')} value={`${collectedAmount.toFixed(2)} €`} subtitle={t('budgetedOf', { amount: totalExpected.toFixed(2) })} icon={<TrendingUp className="w-6 h-6 text-green-600" />} color="green" />
         <StatCard title={t('overdueQuotas')} value={`${totalDebt.toFixed(2)} €`} subtitle={t('toReceive')} icon={<AlertCircle className="w-6 h-6 text-orange-600" />} color="orange" />
       </div>
+
+      {(() => {
+        const now = new Date();
+        const upcoming = (assembleias || [])
+          .filter(a => a.data && new Date(a.data) >= now)
+          .sort((a, b) => new Date(a.data) - new Date(b.data));
+        if (upcoming.length === 0) return null;
+        return (
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2.5 rounded-2xl bg-blue-50">
+                <Calendar className="w-5 h-5 text-blue-600" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-800">{t('upcomingAssemblies') || 'Próximas Assembleias'}</h3>
+            </div>
+            <div className="space-y-3">
+              {upcoming.map(a => (
+                <div key={a.firestoreId} className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl">
+                  <div>
+                    <p className="font-semibold text-slate-800">{a.numero ? `Assembleia ${a.numero}` : 'Assembleia'}{a.tipo === 'extraordinaria' ? ' (Extraordinária)' : ' (Geral)'}</p>
+                    <p className="text-sm text-slate-500">
+                      {new Date(a.data).toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' })}
+                      {a.hora ? ` às ${a.hora}` : ''}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
       <AnnualQuotasTable currentBudget={currentBudget} users={users} />
     </div>
   );
