@@ -1,7 +1,7 @@
 {
   "name": "VizinhAI - Gestão Condominio",
   "short_name": "VizinhAI",
-  "start_url": "index.html",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#1c1b1f",
   "theme_color": "#d0bcff",

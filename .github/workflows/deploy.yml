@@ -14,19 +14,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Inject Firebase Config
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
         env:
-          CONFIG: ${{ secrets.FIREBASE_CONFIG }}
-        run: |
-          node -e "
-          const fs = require('fs');
-          let html = fs.readFileSync('index.html', 'utf8');
-          html = html.replace('__FIREBASE_CONFIG_PLACEHOLDER__', process.env.CONFIG);
-          fs.writeFileSync('index.html', html);
-          "
+          VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
+        run: npm run build
 
       - name: Deploy
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          folder: .
+          folder: dist
           branch: gh-pages
