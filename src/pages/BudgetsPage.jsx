@@ -185,7 +185,7 @@ function BudgetsPage({ budgets, isAdmin, db, appId, selectedCondoId }) {
                         {budget.rubrics.map((rubric, ridx) => (
                           <tr key={ridx}>
                             <td className="px-4 py-3 text-slate-700 font-medium">{rubric.name}</td>
-                            <td className="px-4 py-3 text-slate-900 font-bold text-right">{rubric.value.toFixed(2)} €</td>
+                            <td className="px-4 py-3 text-slate-900 font-bold text-right">{Number(rubric.value).toFixed(2)} €</td>
                           </tr>
                         ))}
                         <tr>
