@@ -125,7 +125,7 @@ function FractionsPage({ users, quotas, isAdmin, db, appId, budgets, currentUser
     }
   };
 
-  const fractionsList = users.map(user => {
+  const fractionsList = [...users].sort((a, b) => (a.fraction || '').localeCompare(b.fraction || '', 'pt')).map(user => {
     const perm = parseFloat(user.permilagem) || 0;
     const quotaBase = (monthlyTotal * (perm / 1000));
     const reserveFund = quotaBase * (rfPerc / 100);

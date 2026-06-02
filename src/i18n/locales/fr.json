@@ -72,6 +72,16 @@
   "mailSuccess": "Succès",
   "mailError": "Erreur",
   "mailNoMails": "Aucun e-mail trouvé.",
-  "upcomingAssemblies": "Prochaines Assemblées"
+  "upcomingAssemblies": "Prochaines Assemblées",
+  "calendar": "Calendrier",
+  "calendarDesc": "Gestion des événements de copropriété",
+  "calendarNewEvent": "Nouvel Événement",
+  "calendarEventName": "Nom de l'événement",
+  "calendarEventDate": "Date",
+  "calendarEventHour": "Heure (optionnel)",
+  "calendarEventNotes": "Notes (optionnel)",
+  "calendarCreateEvent": "Créer Événement",
+  "calendarDeleteConfirm": "Êtes-vous sûr de vouloir supprimer cet événement ?",
+  "calendarNoEvents": "Aucun événement prévu."
 }
 

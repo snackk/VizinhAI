@@ -182,7 +182,7 @@ function BudgetsPage({ budgets, isAdmin, db, appId, selectedCondoId }) {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {budget.rubrics.map((rubric, ridx) => (
+                        {[...budget.rubrics].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt')).map((rubric, ridx) => (
                           <tr key={ridx}>
                             <td className="px-4 py-3 text-slate-700 font-medium">{rubric.name}</td>
                             <td className="px-4 py-3 text-slate-900 font-bold text-right">{Number(rubric.value).toFixed(2)} €</td>

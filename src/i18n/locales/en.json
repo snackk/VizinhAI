@@ -87,6 +87,16 @@
   "convidados": "Invitees",
   "criarAssembleia": "Create Assembly",
   "assembleiaCreated": "Assembly created and invitations sent!",
-  "nenhumaAssembleia": "No assemblies scheduled."
+  "nenhumaAssembleia": "No assemblies scheduled.",
+  "calendar": "Calendar",
+  "calendarDesc": "Manage condominium events",
+  "calendarNewEvent": "New Event",
+  "calendarEventName": "Event Name",
+  "calendarEventDate": "Date",
+  "calendarEventHour": "Hour (optional)",
+  "calendarEventNotes": "Notes (optional)",
+  "calendarCreateEvent": "Create Event",
+  "calendarDeleteConfirm": "Are you sure you want to delete this event?",
+  "calendarNoEvents": "No events scheduled."
 }
 

@@ -87,6 +87,16 @@
   "convidados": "Convidados",
   "criarAssembleia": "Criar Assembleia",
   "assembleiaCreated": "Assembleia criada e convocatórias enviadas!",
-  "nenhumaAssembleia": "Nenhuma assembleia agendada."
+  "nenhumaAssembleia": "Nenhuma assembleia agendada.",
+  "calendar": "Calendário",
+  "calendarDesc": "Gestão de eventos do condomínio",
+  "calendarNewEvent": "Novo Evento",
+  "calendarEventName": "Nome do Evento",
+  "calendarEventDate": "Data",
+  "calendarEventHour": "Hora (opcional)",
+  "calendarEventNotes": "Notas (opcional)",
+  "calendarCreateEvent": "Criar Evento",
+  "calendarDeleteConfirm": "Tem a certeza que deseja eliminar este evento?",
+  "calendarNoEvents": "Nenhum evento agendado."
 }
 
