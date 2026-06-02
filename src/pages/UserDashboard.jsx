@@ -30,11 +30,15 @@ function UserDashboard({ user, quotas, expenses, budgets, users, assembleias, t 
   const now = new Date();
   const debtMonths = months.filter(m => {
     const monthKey = `${m.getFullYear()}-${m.getMonth()}`;
-    const isPaid = quotas.some(q => q.userId === user.firestoreId && q.monthKey === monthKey);
+    const isPaid = quotas.some(q => q.userId === user.firestoreId && q.monthKey === monthKey && q.status === 'paid');
     return !isPaid && (m.getFullYear() < now.getFullYear() || (m.getFullYear() === now.getFullYear() && m.getMonth() <= now.getMonth()));
   });
 
-  const pendingAmount = debtMonths.length * totalMonthly;
+  // Extra quotas (from previous budgets) that are still pending
+  const extraPendingQuotas = quotas.filter(q => q.isExtra && q.userId === user.firestoreId && q.status === 'pending');
+  const extraDebtAmount = extraPendingQuotas.reduce((sum, q) => sum + (q.extraAmount || 0), 0);
+
+  const pendingAmount = (debtMonths.length * totalMonthly) + extraDebtAmount;
   const hasDebt = pendingAmount > 0.01;
   return (
     <div className="space-y-6">
@@ -60,6 +64,17 @@ function UserDashboard({ user, quotas, expenses, budgets, users, assembleias, t 
           {hasDebt && isExpanded && (
             <div className="mt-6 pt-6 border-t border-red-200/50 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
               <p className="text-xs font-bold text-red-800/60 uppercase tracking-widest mb-4">{t('overdueMonths')}</p>
+              {extraPendingQuotas.map((q, idx) => {
+                const [y, m] = q.monthKey.split('-').map(Number);
+                return (
+                  <div key={`extra-${idx}`} className="flex justify-between items-center bg-amber-50/40 p-3 rounded-xl border border-amber-100/50">
+                    <span className="text-sm font-semibold text-amber-900 capitalize">
+                      {t(`months.${m}`)} {y} <span className="text-[10px] text-amber-600 font-normal">(atraso)</span>
+                    </span>
+                    <span className="text-sm font-bold text-amber-700">{(q.extraAmount || 0).toFixed(2)} €</span>
+                  </div>
+                );
+              })}
               {debtMonths.map((m, idx) => (
                 <div key={idx} className="flex justify-between items-center bg-white/40 p-3 rounded-xl border border-red-100/50">
                   <span className="text-sm font-semibold text-red-900 capitalize">
