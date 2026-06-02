@@ -115,6 +115,7 @@ function DocumentsPage({ documents, docTypes, isAdmin, currentUser, db, appId, s
     acc[d.type].push(d);
     return acc;
   }, {});
+  Object.values(groupedDocs).forEach(docs => docs.sort((a, b) => (b.title || '').localeCompare(a.title || '', undefined, { numeric: true })));
 
   return (
     <div className="space-y-6">
