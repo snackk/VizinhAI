@@ -150,7 +150,7 @@ function CondoPage({ condo, isAdmin, db, appId, users, t, selectedCondoId }) {
                         </div>
                         <div className="space-y-1">
                           <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{t('adminEmail')}</p>
-                          <p className="text-slate-900 font-medium">{currentAdmin.email}</p>
+                          <p className="text-slate-900 font-medium">vizinhaipt@gmail.com</p>
                         </div>
                         <div className="space-y-1">
                           <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{t('adminPhone')}</p>
