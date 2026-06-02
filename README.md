@@ -156,7 +156,6 @@ service cloud.firestore {
     // Global Condos collection
     match /condos/{condoId} {
       allow read: if isMember(condoId);
-      allow list: if isBackoffice();
       allow create, delete: if isBackoffice();
       allow update: if isAdmin(condoId);
 
@@ -216,8 +215,8 @@ service firebase.storage {
     match /condos/{condoId}/documents/{fileName} {
       allow read: if isMember(condoId);
       allow write: if isAdmin(condoId)
-                   && request.resource.size < 10 * 1024 * 1024 
-                   && request.resource.contentType.matches('application/pdf|image/.*|application/zip');
+                   && request.resource.size < 50 * 1024 * 1024 
+                   && request.resource.contentType.matches('(application/pdf|image/.*|application/zip)');
     }
   }
 }
