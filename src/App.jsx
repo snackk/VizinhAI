@@ -6,7 +6,7 @@ import { auth, db, storage, appId } from './config/firebase.js';
 import {
   Home, Receipt, PieChart, Users, LogOut, Menu, X,
   AlertCircle, ShieldAlert, FolderOpen, Wallet,
-  TrendingUp, Settings, Calendar, Mail
+  TrendingUp, Settings, Calendar, CalendarDays, Mail
 } from 'lucide-react';
 
 import NavItem from './components/NavItem.jsx';
@@ -24,6 +24,7 @@ import FractionsPage from './pages/FractionsPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import MailsPage from './pages/MailsPage.jsx';
 import AssembleiasPage from './pages/AssembleiasPage.jsx';
+import CalendarPage from './pages/CalendarPage.jsx';
 import CondosPage from './pages/CondosPage.jsx';
 
 function App() {
@@ -194,6 +195,7 @@ function App() {
       case 'definicoes': return <SettingsPage currentUser={currentUser} db={db} appId={appId} t={t} selectedCondoId={selectedCondoId} />;
       case 'mails': return (isAdmin || isBackoffice) ? <MailsPage db={db} t={t} selectedCondoId={effectiveCondoId} isBackoffice={isBackoffice} /> : null;
       case 'assembleias': return isAdmin ? <AssembleiasPage db={db} t={t} selectedCondoId={effectiveCondoId} users={users} condo={condo} currentUser={currentUser} /> : null;
+      case 'calendario': return isAdmin ? <CalendarPage db={db} t={t} selectedCondoId={effectiveCondoId} /> : null;
       case 'condos': return isBackoffice ? <CondosPage allCondos={allCondos} db={db} t={t} onFirstCreate={() => setSelectedCondoId(null)} /> : null;
       default: return isAdmin ? <AdminDashboard expenses={expenses} quotas={quotas} users={users} budgets={budgets} assembleias={assembleias} t={t} /> : null;
     }
@@ -227,6 +229,7 @@ function App() {
               <NavItem icon={<Users />} label={t('fractions')} active={activeTab === 'fracoes'} onClick={() => { setActiveTab('fracoes'); setIsMobileMenuOpen(false); }} />
               {isAdmin && <NavItem icon={<Mail />} label={t('mails')} active={activeTab === 'mails'} onClick={() => { setActiveTab('mails'); setIsMobileMenuOpen(false); }} />}
               {isAdmin && <NavItem icon={<Calendar />} label={t('assembleias')} active={activeTab === 'assembleias'} onClick={() => { setActiveTab('assembleias'); setIsMobileMenuOpen(false); }} />}
+              {isAdmin && <NavItem icon={<CalendarDays />} label={t('calendar')} active={activeTab === 'calendario'} onClick={() => { setActiveTab('calendario'); setIsMobileMenuOpen(false); }} />}
             </>
           )}
         </nav>
