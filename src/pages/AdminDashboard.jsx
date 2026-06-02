@@ -37,14 +37,24 @@ function AdminDashboard({ expenses, quotas, users, budgets, assembleias, t }) {
 
     months.forEach(m => {
       const monthKey = `${m.getFullYear()}-${m.getMonth()}`;
-      const isPaid = quotas.some(q => q.userId === user.firestoreId && q.monthKey === monthKey);
-      
+      const isPaid = quotas.some(q => q.userId === user.firestoreId && q.monthKey === monthKey && q.status === 'paid');
+
       if (isPaid) {
         collectedAmount += totalMonthly;
       } else if (m.getFullYear() < now.getFullYear() || (m.getFullYear() === now.getFullYear() && m.getMonth() <= now.getMonth())) {
         totalDebt += totalMonthly;
       }
     });
+  });
+
+  // Include extra quotas in collected/debt
+  quotas.filter(q => q.isExtra).forEach(q => {
+    const amount = q.extraAmount || 0;
+    if (q.status === 'paid') {
+      collectedAmount += amount;
+    } else {
+      totalDebt += amount;
+    }
   });
 
   return (
