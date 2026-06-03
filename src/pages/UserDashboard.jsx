@@ -34,11 +34,27 @@ function UserDashboard({ user, quotas, expenses, budgets, users, assembleias, t 
     return !isPaid && (m.getFullYear() < now.getFullYear() || (m.getFullYear() === now.getFullYear() && m.getMonth() <= now.getMonth()));
   });
 
+  // Calculate carryover from partial payments
+  let partialPaymentCarry = 0;
+  months.forEach((m, idx) => {
+    const monthKey = `${m.getFullYear()}-${m.getMonth()}`;
+    const quota = quotas.find(q => q.firestoreId === `${user.firestoreId}_${monthKey}`);
+    if (quota && quota.status === 'paid' && quota.paidAmount !== undefined) {
+      const expectedWithCarry = totalMonthly + partialPaymentCarry;
+      const remainder = expectedWithCarry - quota.paidAmount;
+      partialPaymentCarry = remainder > 0.01 ? remainder : 0;
+    } else if (!quota || quota.status !== 'paid') {
+      // unpaid month - carry stays
+    } else {
+      partialPaymentCarry = 0;
+    }
+  });
+
   // Extra quotas (from previous budgets) that are still pending
-  const extraPendingQuotas = quotas.filter(q => q.isExtra && q.userId === user.firestoreId && q.status === 'pending');
+  const extraPendingQuotas = quotas.filter(q => q.isExtra && q.userId === user.firestoreId && q.status === 'pending' && !q.isPartialPayment);
   const extraDebtAmount = extraPendingQuotas.reduce((sum, q) => sum + (q.extraAmount || 0), 0);
 
-  const pendingAmount = (debtMonths.length * totalMonthly) + extraDebtAmount;
+  const pendingAmount = (debtMonths.length * totalMonthly) + extraDebtAmount + partialPaymentCarry;
   const hasDebt = pendingAmount > 0.01;
   return (
     <div className="space-y-6">

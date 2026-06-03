@@ -35,25 +35,35 @@ function AdminDashboard({ expenses, quotas, users, budgets, assembleias, t }) {
     const reserveFund = quotaBase * (rfPerc / 100);
     const totalMonthly = quotaBase + reserveFund;
 
+    let carry = 0;
     months.forEach(m => {
       const monthKey = `${m.getFullYear()}-${m.getMonth()}`;
-      const isPaid = quotas.some(q => q.userId === user.firestoreId && q.monthKey === monthKey && q.status === 'paid');
+      const quota = quotas.find(q => q.firestoreId === `${user.firestoreId}_${monthKey}`);
+      const isPaid = quota && quota.status === 'paid';
+      const expectedWithCarry = totalMonthly + carry;
 
       if (isPaid) {
-        collectedAmount += totalMonthly;
+        const paidAmt = quota.paidAmount !== undefined ? quota.paidAmount : expectedWithCarry;
+        collectedAmount += paidAmt;
+        const remainder = expectedWithCarry - paidAmt;
+        carry = remainder > 0.01 ? remainder : 0;
       } else if (m.getFullYear() < now.getFullYear() || (m.getFullYear() === now.getFullYear() && m.getMonth() <= now.getMonth())) {
-        totalDebt += totalMonthly;
+        totalDebt += expectedWithCarry;
+        carry = 0;
       }
     });
+    // If there's still carry after all months, add to debt
+    if (carry > 0.01) totalDebt += carry;
   });
 
   // Include extra quotas in collected/debt
   quotas.filter(q => q.isExtra).forEach(q => {
-    const amount = q.extraAmount || 0;
-    if (q.status === 'paid') {
-      collectedAmount += amount;
-    } else {
-      totalDebt += amount;
+    if (q.isPartialPayment && q.status === 'paid') {
+      collectedAmount += q.paidAmount || 0;
+    } else if (q.status === 'paid') {
+      collectedAmount += q.paidAmount || q.extraAmount || 0;
+    } else if (q.status === 'pending') {
+      totalDebt += q.extraAmount || 0;
     }
   });
 
