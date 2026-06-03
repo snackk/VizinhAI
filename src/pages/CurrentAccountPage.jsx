@@ -596,9 +596,9 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
           <tbody className="divide-y divide-slate-50">
             {[...users].sort((a, b) => (a.fraction || '').localeCompare(b.fraction || '', 'pt')).map(user => {
               const perm = parseFloat(user.permilagem) || 0;
-              const quotaBase = (monthlyTotal * (perm / 1000));
-              const reserveFund = quotaBase * (rfPerc / 100);
-              const baseTotal = quotaBase + reserveFund;
+              const quotaBase = Math.round((monthlyTotal * (perm / 1000)) * 100) / 100;
+              const reserveFund = Math.round((quotaBase * (rfPerc / 100)) * 100) / 100;
+              const baseTotal = Math.round((quotaBase + reserveFund) * 100) / 100;
 
               return (
                 <tr key={user.firestoreId} className="hover:bg-slate-50/50 transition-colors">
@@ -647,7 +647,7 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
                     const quota = quotas.find(q => q.firestoreId === `${user.firestoreId}_${monthKey}`);
                     const isPaid = quota && quota.status === 'paid';
                     const carryover = getCarryover(user.firestoreId, idx);
-                    const totalWithCarry = baseTotal + carryover;
+                    const totalWithCarry = Math.round((baseTotal + carryover) * 100) / 100;
 
                     return (
                       <td key={idx} className="px-4 py-4 text-center">
