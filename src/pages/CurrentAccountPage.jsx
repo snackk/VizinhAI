@@ -83,13 +83,20 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
       const perm = parseFloat(users.find(u => u.firestoreId === userId)?.permilagem) || 0;
       const qBase = (monthlyTotal * (perm / 1000));
       const rf = qBase * (rfPerc / 100);
-      const baseMonthly = qBase + rf;
 
       if (quota && quota.status === 'paid') {
-        const expectedWithCarry = baseMonthly + carry;
-        const paid = quota.paidAmount !== undefined ? quota.paidAmount : expectedWithCarry;
-        const remainder = expectedWithCarry - paid;
-        carry = remainder > 0.01 ? remainder : 0;
+        // Total expected = quota base + reserve fund + carryover from previous months
+        const totalExpected = qBase + rf + carry;
+        const paid = quota.paidAmount !== undefined ? quota.paidAmount : totalExpected;
+        // Reserve fund is fixed and does NOT carry over to next months
+        // Only the quota base deficit carries over
+        const deficit = totalExpected - paid;
+        if (deficit > 0.01) {
+          // The deficit should not exceed qBase + carry (exclude RF from carryover)
+          carry = Math.min(deficit, qBase + carry);
+        } else {
+          carry = 0;
+        }
       }
       // If not paid, the carry doesn't reset - it stays but this month is still fully owed
       // So carryover only comes from partial payments of paid months

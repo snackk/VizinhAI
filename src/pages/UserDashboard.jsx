@@ -41,8 +41,13 @@ function UserDashboard({ user, quotas, expenses, budgets, users, assembleias, t 
     const quota = quotas.find(q => q.firestoreId === `${user.firestoreId}_${monthKey}`);
     if (quota && quota.status === 'paid' && quota.paidAmount !== undefined) {
       const expectedWithCarry = totalMonthly + partialPaymentCarry;
-      const remainder = expectedWithCarry - quota.paidAmount;
-      partialPaymentCarry = remainder > 0.01 ? remainder : 0;
+      const deficit = expectedWithCarry - quota.paidAmount;
+      // Reserve fund is fixed and does NOT carry over - only quota base deficit carries
+      if (deficit > 0.01) {
+        partialPaymentCarry = Math.min(deficit, quotaBase + partialPaymentCarry);
+      } else {
+        partialPaymentCarry = 0;
+      }
     } else if (!quota || quota.status !== 'paid') {
       // unpaid month - carry stays
     } else {
