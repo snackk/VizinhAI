@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { jsPDF } from 'jspdf';
-import { setDoc, doc, collection, addDoc, runTransaction, getDocs, deleteDoc } from 'firebase/firestore';
+import { setDoc, doc, collection, addDoc, runTransaction, getDocs, deleteDoc, updateDoc } from 'firebase/firestore';
 import { Wallet, CheckCircle, PlusCircle, X, Trash2 } from 'lucide-react';
 
 function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo, t, selectedCondoId }) {
@@ -9,6 +9,10 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
   const [extraYear, setExtraYear] = useState('');
   const [extraQuotas, setExtraQuotas] = useState({});
   const [loadingExtra, setLoadingExtra] = useState(false);
+  // Payment modal state
+  const [paymentModal, setPaymentModal] = useState(null); // { userId, monthKey, isExtra, owedAmount }
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentLoading, setPaymentLoading] = useState(false);
 
   const sortedBudgets = [...budgets].sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
   const currentBudget = sortedBudgets[0];
@@ -47,6 +51,51 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
     const [yB, mB] = b.split('-').map(Number);
     return yA !== yB ? yA - yB : mA - mB;
   });
+
+  // Calculate carryover for a user: sum of unpaid differences from previous months
+  const getCarryover = (userId, currentMonthIndex) => {
+    let carry = 0;
+    for (let i = 0; i < currentMonthIndex; i++) {
+      const m = months[i];
+      const monthKey = `${m.getFullYear()}-${m.getMonth()}`;
+      const quota = quotas.find(q => q.firestoreId === `${userId}_${monthKey}`);
+      if (quota && quota.status === 'paid' && quota.paidAmount !== undefined) {
+        const perm = parseFloat(users.find(u => u.firestoreId === userId)?.permilagem) || 0;
+        const qBase = (monthlyTotal * (perm / 1000));
+        const rf = qBase * (rfPerc / 100);
+        const expectedTotal = qBase + rf + (quota.carryoverAmount || 0);
+        const diff = expectedTotal - quota.paidAmount;
+        if (diff > 0.01) {
+          carry += diff;
+        }
+      } else if (!quota || quota.status !== 'paid') {
+        // Unpaid month - no carryover generated from it (it's still owed in full)
+        // But if previous months had carryover, it accumulates
+      }
+    }
+    // Actually, simpler approach: carryover is only from the immediately prior paid months
+    // Let's recalculate properly - each month's remainder passes to the next
+    carry = 0;
+    for (let i = 0; i < currentMonthIndex; i++) {
+      const m = months[i];
+      const monthKey = `${m.getFullYear()}-${m.getMonth()}`;
+      const quota = quotas.find(q => q.firestoreId === `${userId}_${monthKey}`);
+      const perm = parseFloat(users.find(u => u.firestoreId === userId)?.permilagem) || 0;
+      const qBase = (monthlyTotal * (perm / 1000));
+      const rf = qBase * (rfPerc / 100);
+      const baseMonthly = qBase + rf;
+
+      if (quota && quota.status === 'paid') {
+        const expectedWithCarry = baseMonthly + carry;
+        const paid = quota.paidAmount !== undefined ? quota.paidAmount : expectedWithCarry;
+        const remainder = expectedWithCarry - paid;
+        carry = remainder > 0.01 ? remainder : 0;
+      }
+      // If not paid, the carry doesn't reset - it stays but this month is still fully owed
+      // So carryover only comes from partial payments of paid months
+    }
+    return carry;
+  };
 
   const handleAddExtraMonth = async () => {
     if (!extraMonth || !extraYear) return alert('Preencha mês e ano.');
@@ -114,72 +163,107 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
     }
   };
 
-  const togglePaid = async (userId, monthKey) => {
+  // Open payment modal when admin clicks a quota cell
+  const openPaymentModal = (userId, monthKey, isExtra, owedAmount) => {
     if (!isAdmin) return;
-    const quotaId = `${userId}_${monthKey}`;
-    const existing = quotas.find(q => q.firestoreId === quotaId);
+    setPaymentModal({ userId, monthKey, isExtra, owedAmount });
+    setPaymentAmount(owedAmount.toFixed(2));
+  };
 
-    if (existing && existing.status === 'paid') {
-      alert('Uma quota já paga não pode ser revertida, pois o recibo já foi enviado por e-mail.');
-      return;
-    }
+  const handlePayment = async () => {
+    if (!paymentModal) return;
+    const { userId, monthKey, isExtra, owedAmount } = paymentModal;
+    const paid = parseFloat(paymentAmount);
+
+    if (isNaN(paid) || paid <= 0) return alert('Introduza um valor válido.');
+    if (paid > owedAmount + 0.01) return alert(`O valor não pode exceder o montante em dívida (${owedAmount.toFixed(2)}€).`);
 
     const user = users.find(u => u.firestoreId === userId);
     const [year, monthIdx] = monthKey.split('-').map(Number);
     const monthName = t(`months.${monthIdx}`);
 
-    const isExtraQuota = existing && existing.isExtra;
-    const extraAmount = existing?.extraAmount;
-
-    if (!isExtraQuota && existing) {
-      alert('Uma quota já paga não pode ser revertida, pois o recibo já foi enviado por e-mail.');
+    if (!confirm(`Confirma o pagamento de ${paid.toFixed(2)}€ referente a ${monthName} ${year} (${user.fraction})? Esta ação é irreversível e enviará um e-mail de recibo.`)) {
       return;
     }
 
-    const perm = parseFloat(user.permilagem) || 0;
-    const quotaBase = isExtraQuota ? extraAmount : (monthlyTotal * (perm / 1000));
-    const reserveFund = isExtraQuota ? 0 : quotaBase * (rfPerc / 100);
-    const total = quotaBase + reserveFund;
-
-    if (!confirm(`Tem a certeza que deseja marcar a quota de ${monthName} ${year} (${user.fraction}) como paga? Valor: ${total.toFixed(2)}€. Esta ação é irreversível e enviará um e-mail de recibo.`)) {
-      return;
-    }
-
+    setPaymentLoading(true);
     try {
       let receiptNumber = 1;
       const condoRef = doc(db, 'condos', selectedCondoId);
       
-      try {
-        await runTransaction(db, async (transaction) => {
-          const condoDoc = await transaction.get(condoRef);
-          if (!condoDoc.exists()) {
-            throw "Documento do condomínio não existe!";
-          }
-          receiptNumber = (condoDoc.data().lastReceiptNumber || 0) + 1;
-          transaction.update(condoRef, { lastReceiptNumber: receiptNumber });
-        });
-      } catch (transErr) {
-        console.error("Erro na transação do contador:", transErr);
-        throw transErr;
-      }
+      await runTransaction(db, async (transaction) => {
+        const condoDoc = await transaction.get(condoRef);
+        if (!condoDoc.exists()) throw "Documento do condomínio não existe!";
+        receiptNumber = (condoDoc.data().lastReceiptNumber || 0) + 1;
+        transaction.update(condoRef, { lastReceiptNumber: receiptNumber });
+      });
 
-      if (isExtraQuota) {
-        await setDoc(doc(db, 'condos', selectedCondoId, 'quotas', quotaId), {
-          ...existing,
-          status: 'paid',
-          receiptNumber,
-          updatedAt: new Date().toISOString()
-        });
+      const quotaId = `${userId}_${monthKey}`;
+      const existing = quotas.find(q => q.firestoreId === quotaId);
+
+      if (isExtra) {
+        const currentAmount = existing?.extraAmount || owedAmount;
+        const isFullPayment = paid >= currentAmount - 0.01;
+
+        if (isFullPayment) {
+          // Full payment of extra quota
+          await setDoc(doc(db, 'condos', selectedCondoId, 'quotas', quotaId), {
+            ...(existing || {}),
+            userId,
+            monthKey,
+            isExtra: true,
+            extraAmount: currentAmount,
+            status: 'paid',
+            paidAmount: paid,
+            receiptNumber,
+            updatedAt: new Date().toISOString()
+          });
+        } else {
+          // Partial payment - reduce extraAmount, create a payment record
+          const remaining = currentAmount - paid;
+          await setDoc(doc(db, 'condos', selectedCondoId, 'quotas', quotaId), {
+            ...(existing || {}),
+            userId,
+            monthKey,
+            isExtra: true,
+            extraAmount: remaining,
+            status: 'pending',
+            updatedAt: new Date().toISOString()
+          });
+          // Store partial payment record
+          await addDoc(collection(db, 'condos', selectedCondoId, 'quotas'), {
+            userId,
+            monthKey,
+            isExtra: true,
+            isPartialPayment: true,
+            paidAmount: paid,
+            receiptNumber,
+            status: 'paid',
+            createdAt: new Date().toISOString()
+          });
+        }
       } else {
+        // Budget month payment
+        const perm = parseFloat(user.permilagem) || 0;
+        const qBase = (monthlyTotal * (perm / 1000));
+        const rf = qBase * (rfPerc / 100);
+        const baseMonthly = qBase + rf;
+        const monthIndex = months.findIndex(m => `${m.getFullYear()}-${m.getMonth()}` === monthKey);
+        const carryover = getCarryover(userId, monthIndex);
+        const isFullPayment = paid >= owedAmount - 0.01;
+
         await setDoc(doc(db, 'condos', selectedCondoId, 'quotas', quotaId), {
           userId,
           monthKey,
           status: 'paid',
+          paidAmount: paid,
+          carryoverAmount: carryover,
           receiptNumber,
           updatedAt: new Date().toISOString()
         });
       }
 
+      // Generate PDF and send email
       try {
         if (user && user.email) {
           const dateObj = new Date();
@@ -191,7 +275,6 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
           let pdfBase64 = null;
           try {
             const docPdf = new jsPDF();
-
             docPdf.setFont("helvetica");
             docPdf.setFontSize(10);
             docPdf.setFont("helvetica", "bold");
@@ -237,38 +320,56 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
             const dueDate = `08-${String(monthIdx + 1).padStart(2, '0')}-${year}`;
             const monthNameStr = monthName.charAt(0).toUpperCase() + monthName.slice(1);
 
-            if (isExtraQuota) {
+            if (isExtra) {
               docPdf.text(docDate, 15, rowY);
               docPdf.text(dueDate, 40, rowY);
               docPdf.text(user.fraction, 65, rowY);
               docPdf.text(`Quota em atraso - ${monthNameStr} / ${year}`, 85, rowY);
-              docPdf.text(quotaBase.toFixed(2).replace('.', ','), 195, rowY, { align: "right" });
+              docPdf.text(paid.toFixed(2).replace('.', ','), 195, rowY, { align: "right" });
             } else {
+              const perm = parseFloat(user.permilagem) || 0;
+              const qBase = (monthlyTotal * (perm / 1000));
+              const rf = qBase * (rfPerc / 100);
+              // Show quota + reserve fund proportionally
+              const proportion = paid / owedAmount;
+              const quotaPart = qBase * proportion;
+              const rfPart = rf * proportion;
+
               docPdf.text(docDate, 15, rowY);
               docPdf.text(dueDate, 40, rowY);
               docPdf.text(user.fraction, 65, rowY);
               docPdf.text(`Quota do orçamento - ${monthNameStr} / ${year}`, 85, rowY);
-              docPdf.text(quotaBase.toFixed(2).replace('.', ','), 195, rowY, { align: "right" });
+              docPdf.text(quotaPart.toFixed(2).replace('.', ','), 195, rowY, { align: "right" });
 
               rowY += 6;
               docPdf.text(docDate, 15, rowY);
               docPdf.text(dueDate, 40, rowY);
               docPdf.text(user.fraction, 65, rowY);
               docPdf.text(`Quota do fundo comum de reserva - ${monthNameStr} / ${year}`, 85, rowY);
-              docPdf.text(reserveFund.toFixed(2).replace('.', ','), 195, rowY, { align: "right" });
+              docPdf.text(rfPart.toFixed(2).replace('.', ','), 195, rowY, { align: "right" });
+
+              if (owedAmount > qBase + rf + 0.01) {
+                const carryPart = paid - quotaPart - rfPart;
+                if (carryPart > 0.01) {
+                  rowY += 6;
+                  docPdf.text(docDate, 15, rowY);
+                  docPdf.text(dueDate, 40, rowY);
+                  docPdf.text(user.fraction, 65, rowY);
+                  docPdf.text(`Regularização de valor em atraso`, 85, rowY);
+                  docPdf.text(carryPart.toFixed(2).replace('.', ','), 195, rowY, { align: "right" });
+                }
+              }
             }
 
             rowY += 6;
             docPdf.line(15, rowY, 195, rowY);
-
             rowY += 6;
             docPdf.setFontSize(8);
             docPdf.text("Isento de I.V.A. nos termos do artº 9º do nº21 do CIVA", 15, rowY);
             docPdf.setFontSize(9);
             docPdf.setFont("helvetica", "bold");
             docPdf.text("Total:", 160, rowY);
-            docPdf.text(total.toFixed(2).replace('.', ','), 195, rowY, { align: "right" });
-
+            docPdf.text(paid.toFixed(2).replace('.', ','), 195, rowY, { align: "right" });
             rowY += 6;
             docPdf.setFont("helvetica", "bold");
             docPdf.text("Pagamento:", 15, rowY);
@@ -308,11 +409,15 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
         }
       } catch (mailErr) {
         console.error("Erro ao enviar email:", mailErr);
-        alert('Quota marcada como paga, mas houve um erro ao enviar o e-mail: ' + mailErr.message + '\n\nCertifique-se de que adicionou a regra para a coleção "mail" no Firestore.');
+        alert('Quota marcada como paga, mas houve um erro ao enviar o e-mail: ' + mailErr.message);
       }
+
+      setPaymentModal(null);
+      setPaymentAmount('');
     } catch (err) {
-      alert('Erro ao atualizar estado de pagamento: ' + err.message);
+      alert('Erro ao processar pagamento: ' + err.message);
     }
+    setPaymentLoading(false);
   };
 
   return (
@@ -332,6 +437,64 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
           </button>
         )}
       </div>
+
+      {/* Payment Modal */}
+      {paymentModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => { setPaymentModal(null); setPaymentAmount(''); }}>
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-slate-800">Registar Pagamento</h3>
+              <button onClick={() => { setPaymentModal(null); setPaymentAmount(''); }} className="p-2 hover:bg-slate-100 rounded-xl">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            {(() => {
+              const user = users.find(u => u.firestoreId === paymentModal.userId);
+              const [year, monthIdx] = paymentModal.monthKey.split('-').map(Number);
+              return (
+                <div className="space-y-4">
+                  <div className="bg-slate-50 p-4 rounded-2xl space-y-1">
+                    <p className="text-sm text-slate-500">Condómino</p>
+                    <p className="font-bold text-slate-800">{user?.fraction} - {user?.name}</p>
+                    <p className="text-sm text-slate-500 mt-2">Referência</p>
+                    <p className="font-semibold text-slate-700 capitalize">{t(`months.${monthIdx}`)} {year} {paymentModal.isExtra && <span className="text-amber-600 text-xs">(Extra)</span>}</p>
+                    <p className="text-sm text-slate-500 mt-2">Valor em dívida</p>
+                    <p className="font-bold text-red-600 text-xl">{paymentModal.owedAmount.toFixed(2)} €</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Valor pago (€)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      max={paymentModal.owedAmount}
+                      value={paymentAmount}
+                      onChange={e => setPaymentAmount(e.target.value)}
+                      className="w-full px-4 py-3 border border-slate-200 rounded-xl text-lg font-semibold text-center"
+                      autoFocus
+                    />
+                    {parseFloat(paymentAmount) < paymentModal.owedAmount - 0.01 && parseFloat(paymentAmount) > 0 && (
+                      <p className="text-xs text-amber-600 mt-2 font-medium">
+                        ⚠️ Pagamento parcial — {paymentModal.isExtra ? 'o valor restante ficará pendente nesta quota extra' : 'a diferença será adicionada ao próximo mês'}.
+                      </p>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={handlePayment}
+                    disabled={paymentLoading || !paymentAmount || parseFloat(paymentAmount) <= 0}
+                    className="w-full py-3 bg-green-600 text-white rounded-2xl font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors"
+                  >
+                    {paymentLoading ? 'A processar...' : `Emitir Recibo de ${parseFloat(paymentAmount || 0).toFixed(2)}€`}
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* Modal para adicionar mês extra */}
       {showExtraForm && (
@@ -428,7 +591,7 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
               const perm = parseFloat(user.permilagem) || 0;
               const quotaBase = (monthlyTotal * (perm / 1000));
               const reserveFund = quotaBase * (rfPerc / 100);
-              const total = quotaBase + reserveFund;
+              const baseTotal = quotaBase + reserveFund;
 
               return (
                 <tr key={user.firestoreId} className="hover:bg-slate-50/50 transition-colors">
@@ -438,7 +601,7 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
                   </td>
                   {/* Extra month columns */}
                   {extraMonthKeys.map(key => {
-                    const extraQuota = quotas.find(q => q.isExtra && q.userId === user.firestoreId && q.monthKey === key);
+                    const extraQuota = quotas.find(q => q.isExtra && q.userId === user.firestoreId && q.monthKey === key && !q.isPartialPayment);
                     if (!extraQuota) {
                       return (
                         <td key={key} className="px-4 py-4 text-center bg-amber-50/20">
@@ -451,7 +614,7 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
                     return (
                       <td key={key} className="px-4 py-4 text-center bg-amber-50/20">
                         <button
-                          onClick={() => togglePaid(user.firestoreId, key)}
+                          onClick={() => !isPaid && openPaymentModal(user.firestoreId, key, true, amount)}
                           disabled={!isAdmin || isPaid}
                           className={`w-full p-2 rounded-xl transition-all border ${isPaid ? 'bg-green-50 border-green-100 text-green-700 cursor-not-allowed' : 'bg-white border-amber-200 text-amber-600 hover:border-amber-300'}`}
                         >
@@ -474,11 +637,15 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
                   {/* Regular budget month columns */}
                   {months.map((m, idx) => {
                     const monthKey = `${m.getFullYear()}-${m.getMonth()}`;
-                    const isPaid = quotas.some(q => q.userId === user.firestoreId && q.monthKey === monthKey && q.status === 'paid');
+                    const quota = quotas.find(q => q.firestoreId === `${user.firestoreId}_${monthKey}`);
+                    const isPaid = quota && quota.status === 'paid';
+                    const carryover = getCarryover(user.firestoreId, idx);
+                    const totalWithCarry = baseTotal + carryover;
+
                     return (
                       <td key={idx} className="px-4 py-4 text-center">
                         <button 
-                          onClick={() => togglePaid(user.firestoreId, monthKey)}
+                          onClick={() => !isPaid && openPaymentModal(user.firestoreId, monthKey, false, totalWithCarry)}
                           disabled={!isAdmin || isPaid}
                           className={`w-full p-2 rounded-xl transition-all border ${isPaid ? 'bg-green-50 border-green-100 text-green-700 cursor-not-allowed opacity-100' : 'bg-white border-slate-100 text-slate-400 hover:border-blue-200'}`}
                         >
@@ -486,13 +653,19 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
                             <div className="flex flex-col items-center">
                               <CheckCircle className="w-4 h-4 mb-0.5" />
                               <span className="text-[10px] font-bold uppercase tracking-tight">Pago</span>
+                              {quota.paidAmount !== undefined && quota.paidAmount < totalWithCarry - 0.01 && (
+                                <span className="text-[9px] text-amber-600 font-medium">{quota.paidAmount.toFixed(2)}€</span>
+                              )}
                             </div>
                           ) : (
                             <div className="flex flex-col items-center opacity-60 group-hover:opacity-100">
                               <div className="text-[10px] font-medium leading-tight">
                                 <div>Q: {quotaBase.toFixed(2)}€</div>
                                 <div>FR: {reserveFund.toFixed(2)}€</div>
-                                <div className="border-t border-slate-200 mt-1 pt-0.5 font-bold text-slate-600">Σ {total.toFixed(2)}€</div>
+                                {carryover > 0.01 && (
+                                  <div className="text-amber-600">+{carryover.toFixed(2)}€</div>
+                                )}
+                                <div className="border-t border-slate-200 mt-1 pt-0.5 font-bold text-slate-600">Σ {totalWithCarry.toFixed(2)}€</div>
                               </div>
                             </div>
                           )}
