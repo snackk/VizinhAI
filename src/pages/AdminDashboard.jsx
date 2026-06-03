@@ -45,8 +45,13 @@ function AdminDashboard({ expenses, quotas, users, budgets, assembleias, t }) {
       if (isPaid) {
         const paidAmt = quota.paidAmount !== undefined ? quota.paidAmount : expectedWithCarry;
         collectedAmount += paidAmt;
-        const remainder = expectedWithCarry - paidAmt;
-        carry = remainder > 0.01 ? remainder : 0;
+        const deficit = expectedWithCarry - paidAmt;
+        // Reserve fund is fixed and does NOT carry over - only quota base deficit carries
+        if (deficit > 0.01) {
+          carry = Math.min(deficit, quotaBase + carry);
+        } else {
+          carry = 0;
+        }
       } else if (m.getFullYear() < now.getFullYear() || (m.getFullYear() === now.getFullYear() && m.getMonth() <= now.getMonth())) {
         totalDebt += expectedWithCarry;
         carry = 0;
