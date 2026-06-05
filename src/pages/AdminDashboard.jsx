@@ -36,19 +36,33 @@ function AdminDashboard({ expenses, quotas, users, budgets, assembleias, t }) {
     const totalMonthly = quotaBase + reserveFund;
 
     let carry = 0;
+    // Check credit from overpaid extra quotas for this user
+    const userExtraQuotas = quotas.filter(q => q.isExtra && q.userId === user.firestoreId && q.status === 'paid' && !q.isPartialPayment);
+    for (const eq of userExtraQuotas) {
+      const extraAmount = eq.extraAmount || 0;
+      const paidAmount = eq.paidAmount || 0;
+      const extraOverpayment = Math.round((paidAmount - extraAmount) * 100) / 100;
+      if (extraOverpayment > 0.01) {
+        carry -= extraOverpayment;
+      }
+    }
+
     months.forEach(m => {
       const monthKey = `${m.getFullYear()}-${m.getMonth()}`;
       const quota = quotas.find(q => q.firestoreId === `${user.firestoreId}_${monthKey}`);
       const isPaid = quota && quota.status === 'paid';
-      const expectedWithCarry = totalMonthly + carry;
+      const expectedWithCarry = Math.max(totalMonthly + carry, 0);
 
       if (isPaid) {
         const paidAmt = quota.paidAmount !== undefined ? quota.paidAmount : expectedWithCarry;
         collectedAmount += paidAmt;
-        const deficit = expectedWithCarry - paidAmt;
+        const diff = Math.round((expectedWithCarry - paidAmt) * 100) / 100;
         // Reserve fund is fixed and does NOT carry over - only quota base deficit carries
-        if (deficit > 0.01) {
-          carry = Math.min(deficit, quotaBase + carry);
+        if (diff > 0.01) {
+          carry = Math.round(Math.min(diff, Math.max(quotaBase + carry, 0)) * 100) / 100;
+        } else if (diff < -0.01) {
+          // Overpayment: credit carries to next month (negative carry)
+          carry = diff;
         } else {
           carry = 0;
         }
@@ -57,7 +71,7 @@ function AdminDashboard({ expenses, quotas, users, budgets, assembleias, t }) {
         carry = 0;
       }
     });
-    // If there's still carry after all months, add to debt
+    // If there's still carry (debt) after all months, add to debt
     if (carry > 0.01) totalDebt += carry;
   });
 

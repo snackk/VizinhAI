@@ -52,54 +52,57 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
     return yA !== yB ? yA - yB : mA - mB;
   });
 
-  // Calculate carryover for a user: sum of unpaid differences from previous months
+  // Calculate carryover for a user: positive = debt from previous months, negative = credit (overpayment)
   const getCarryover = (userId, currentMonthIndex) => {
+    // Start by checking credit from overpaid extra quotas
     let carry = 0;
-    for (let i = 0; i < currentMonthIndex; i++) {
-      const m = months[i];
-      const monthKey = `${m.getFullYear()}-${m.getMonth()}`;
-      const quota = quotas.find(q => q.firestoreId === `${userId}_${monthKey}`);
-      if (quota && quota.status === 'paid' && quota.paidAmount !== undefined) {
-        const perm = parseFloat(users.find(u => u.firestoreId === userId)?.permilagem) || 0;
-        const qBase = (monthlyTotal * (perm / 1000));
-        const rf = qBase * (rfPerc / 100);
-        const expectedTotal = qBase + rf + (quota.carryoverAmount || 0);
-        const diff = expectedTotal - quota.paidAmount;
-        if (diff > 0.01) {
-          carry += diff;
-        }
-      } else if (!quota || quota.status !== 'paid') {
-        // Unpaid month - no carryover generated from it (it's still owed in full)
-        // But if previous months had carryover, it accumulates
+    const userExtraQuotas = quotas.filter(q => q.isExtra && q.userId === userId && q.status === 'paid' && !q.isPartialPayment);
+    for (const eq of userExtraQuotas) {
+      const extraAmount = eq.extraAmount || 0;
+      const paidAmount = eq.paidAmount || 0;
+      const extraOverpayment = Math.round((paidAmount - extraAmount) * 100) / 100;
+      if (extraOverpayment > 0.01) {
+        // Credit from overpaying an extra quota
+        carry -= extraOverpayment;
       }
     }
-    // Actually, simpler approach: carryover is only from the immediately prior paid months
-    // Let's recalculate properly - each month's remainder passes to the next
-    carry = 0;
+
     for (let i = 0; i < currentMonthIndex; i++) {
       const m = months[i];
       const monthKey = `${m.getFullYear()}-${m.getMonth()}`;
       const quota = quotas.find(q => q.firestoreId === `${userId}_${monthKey}`);
       const perm = parseFloat(users.find(u => u.firestoreId === userId)?.permilagem) || 0;
-      const qBase = (monthlyTotal * (perm / 1000));
-      const rf = qBase * (rfPerc / 100);
+      const qBase = Math.round((monthlyTotal * (perm / 1000)) * 100) / 100;
+      const rf = Math.round((qBase * (rfPerc / 100)) * 100) / 100;
 
       if (quota && quota.status === 'paid') {
-        // Total expected = quota base + reserve fund + carryover from previous months
-        const totalExpected = qBase + rf + carry;
-        const paid = quota.paidAmount !== undefined ? quota.paidAmount : totalExpected;
-        // Reserve fund is fixed and does NOT carry over to next months
-        // Only the quota base deficit carries over
-        const deficit = totalExpected - paid;
-        if (deficit > 0.01) {
-          // The deficit should not exceed qBase + carry (exclude RF from carryover)
-          carry = Math.min(deficit, qBase + carry);
+        // Total expected = quota base + reserve fund + carryover from previous months (can be negative = credit)
+        const totalExpected = Math.round((qBase + rf + carry) * 100) / 100;
+        const paid = quota.paidAmount !== undefined ? quota.paidAmount : Math.max(totalExpected, 0);
+        const diff = Math.round((Math.max(totalExpected, 0) - paid) * 100) / 100;
+
+        if (diff > 0.01) {
+          // Underpayment: the deficit passes to the next month only
+          carry = Math.round(Math.min(diff, Math.max(qBase + carry, 0)) * 100) / 100;
+        } else if (diff < -0.01) {
+          // Overpayment: credit carries to next month (negative carry)
+          carry = diff;
         } else {
           carry = 0;
         }
+      } else if (!quota || quota.status !== 'paid') {
+        // Unpaid month: absorbs carry (both debt and credit)
+        // Debt: this unpaid month will show the carry, so reset it
+        // Credit: absorb month cost from credit
+        if (carry > 0.01) {
+          // Debt is absorbed by this unpaid month (it's shown here), reset carry
+          carry = 0;
+        } else if (carry < -0.01) {
+          const monthTotal = qBase + rf;
+          carry = Math.round((carry + monthTotal) * 100) / 100;
+          if (carry > 0) carry = 0; // Don't create debt from absorbing, just reduce credit
+        }
       }
-      // If not paid, the carry doesn't reset - it stays but this month is still fully owed
-      // So carryover only comes from partial payments of paid months
     }
     return carry;
   };
@@ -183,13 +186,17 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
     const paid = parseFloat(paymentAmount);
 
     if (isNaN(paid) || paid <= 0) return alert('Introduza um valor válido.');
-    if (paid > owedAmount + 0.01) return alert(`O valor não pode exceder o montante em dívida (${owedAmount.toFixed(2)}€).`);
 
     const user = users.find(u => u.firestoreId === userId);
     const [year, monthIdx] = monthKey.split('-').map(Number);
     const monthName = t(`months.${monthIdx}`);
 
-    if (!confirm(`Confirma o pagamento de ${paid.toFixed(2)}€ referente a ${monthName} ${year} (${user.fraction})? Esta ação é irreversível e enviará um e-mail de recibo.`)) {
+    const overpayment = paid > owedAmount + 0.01 ? Math.round((paid - owedAmount) * 100) / 100 : 0;
+    const confirmMsg = overpayment > 0
+      ? `Confirma o pagamento de ${paid.toFixed(2)}€ referente a ${monthName} ${year} (${user.fraction})? O excedente de ${overpayment.toFixed(2)}€ será aplicado como crédito no(s) mês(es) seguinte(s). Esta ação é irreversível e enviará um e-mail de recibo.`
+      : `Confirma o pagamento de ${paid.toFixed(2)}€ referente a ${monthName} ${year} (${user.fraction})? Esta ação é irreversível e enviará um e-mail de recibo.`;
+
+    if (!confirm(confirmMsg)) {
       return;
     }
 
@@ -210,10 +217,10 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
 
       if (isExtra) {
         const currentAmount = existing?.extraAmount || owedAmount;
-        const isFullPayment = paid >= currentAmount - 0.01;
+        const isFullOrOverPayment = paid >= currentAmount - 0.01;
 
-        if (isFullPayment) {
-          // Full payment of extra quota
+        if (isFullOrOverPayment) {
+          // Full or overpayment of extra quota - store full paidAmount (credit will carry to budget months)
           await setDoc(doc(db, 'condos', selectedCondoId, 'quotas', quotaId), {
             ...(existing || {}),
             userId,
@@ -227,7 +234,7 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
           });
         } else {
           // Partial payment - reduce extraAmount, create a payment record
-          const remaining = currentAmount - paid;
+          const remaining = Math.round((currentAmount - paid) * 100) / 100;
           await setDoc(doc(db, 'condos', selectedCondoId, 'quotas', quotaId), {
             ...(existing || {}),
             userId,
@@ -328,36 +335,74 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
             const monthNameStr = monthName.charAt(0).toUpperCase() + monthName.slice(1);
 
             if (isExtra) {
+              const extraAmount = owedAmount;
               docPdf.text(docDate, 15, rowY);
               docPdf.text(dueDate, 40, rowY);
               docPdf.text(user.fraction, 65, rowY);
               docPdf.text(`Quota em atraso - ${monthNameStr} / ${year}`, 85, rowY);
-              docPdf.text(paid.toFixed(2).replace('.', ','), 195, rowY, { align: "right" });
+              docPdf.text(Math.min(paid, extraAmount).toFixed(2).replace('.', ','), 195, rowY, { align: "right" });
+
+              if (paid > extraAmount + 0.01) {
+                const advancePart = Math.round((paid - extraAmount) * 100) / 100;
+                rowY += 6;
+                docPdf.text(docDate, 15, rowY);
+                docPdf.text(dueDate, 40, rowY);
+                docPdf.text(user.fraction, 65, rowY);
+                docPdf.text(`Adiantamento para meses seguintes`, 85, rowY);
+                docPdf.text(advancePart.toFixed(2).replace('.', ','), 195, rowY, { align: "right" });
+              }
             } else {
               const perm = parseFloat(user.permilagem) || 0;
-              const qBase = (monthlyTotal * (perm / 1000));
-              const rf = qBase * (rfPerc / 100);
-              // Show quota + reserve fund proportionally
-              const proportion = paid / owedAmount;
-              const quotaPart = qBase * proportion;
-              const rfPart = rf * proportion;
+              const qBase = Math.round((monthlyTotal * (perm / 1000)) * 100) / 100;
+              const rf = Math.round((qBase * (rfPerc / 100)) * 100) / 100;
 
-              docPdf.text(docDate, 15, rowY);
-              docPdf.text(dueDate, 40, rowY);
-              docPdf.text(user.fraction, 65, rowY);
-              docPdf.text(`Quota do orçamento - ${monthNameStr} / ${year}`, 85, rowY);
-              docPdf.text(quotaPart.toFixed(2).replace('.', ','), 195, rowY, { align: "right" });
+              if (paid <= owedAmount + 0.01) {
+                // Normal or partial payment - show proportional breakdown
+                const proportion = paid / owedAmount;
+                const quotaPart = Math.round((qBase * proportion) * 100) / 100;
+                const rfPart = Math.round((rf * proportion) * 100) / 100;
 
-              rowY += 6;
-              docPdf.text(docDate, 15, rowY);
-              docPdf.text(dueDate, 40, rowY);
-              docPdf.text(user.fraction, 65, rowY);
-              docPdf.text(`Quota do fundo comum de reserva - ${monthNameStr} / ${year}`, 85, rowY);
-              docPdf.text(rfPart.toFixed(2).replace('.', ','), 195, rowY, { align: "right" });
+                docPdf.text(docDate, 15, rowY);
+                docPdf.text(dueDate, 40, rowY);
+                docPdf.text(user.fraction, 65, rowY);
+                docPdf.text(`Quota do orçamento - ${monthNameStr} / ${year}`, 85, rowY);
+                docPdf.text(quotaPart.toFixed(2).replace('.', ','), 195, rowY, { align: "right" });
 
-              if (owedAmount > qBase + rf + 0.01) {
-                const carryPart = paid - quotaPart - rfPart;
-                if (carryPart > 0.01) {
+                rowY += 6;
+                docPdf.text(docDate, 15, rowY);
+                docPdf.text(dueDate, 40, rowY);
+                docPdf.text(user.fraction, 65, rowY);
+                docPdf.text(`Quota do fundo comum de reserva - ${monthNameStr} / ${year}`, 85, rowY);
+                docPdf.text(rfPart.toFixed(2).replace('.', ','), 195, rowY, { align: "right" });
+
+                if (owedAmount > qBase + rf + 0.01) {
+                  const carryPart = Math.round((paid - quotaPart - rfPart) * 100) / 100;
+                  if (carryPart > 0.01) {
+                    rowY += 6;
+                    docPdf.text(docDate, 15, rowY);
+                    docPdf.text(dueDate, 40, rowY);
+                    docPdf.text(user.fraction, 65, rowY);
+                    docPdf.text(`Regularização de valor em atraso`, 85, rowY);
+                    docPdf.text(carryPart.toFixed(2).replace('.', ','), 195, rowY, { align: "right" });
+                  }
+                }
+              } else {
+                // Overpayment - show full quota + reserve fund + advance line
+                docPdf.text(docDate, 15, rowY);
+                docPdf.text(dueDate, 40, rowY);
+                docPdf.text(user.fraction, 65, rowY);
+                docPdf.text(`Quota do orçamento - ${monthNameStr} / ${year}`, 85, rowY);
+                docPdf.text(qBase.toFixed(2).replace('.', ','), 195, rowY, { align: "right" });
+
+                rowY += 6;
+                docPdf.text(docDate, 15, rowY);
+                docPdf.text(dueDate, 40, rowY);
+                docPdf.text(user.fraction, 65, rowY);
+                docPdf.text(`Quota do fundo comum de reserva - ${monthNameStr} / ${year}`, 85, rowY);
+                docPdf.text(rf.toFixed(2).replace('.', ','), 195, rowY, { align: "right" });
+
+                if (owedAmount > qBase + rf + 0.01) {
+                  const carryPart = Math.round((owedAmount - qBase - rf) * 100) / 100;
                   rowY += 6;
                   docPdf.text(docDate, 15, rowY);
                   docPdf.text(dueDate, 40, rowY);
@@ -365,6 +410,14 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
                   docPdf.text(`Regularização de valor em atraso`, 85, rowY);
                   docPdf.text(carryPart.toFixed(2).replace('.', ','), 195, rowY, { align: "right" });
                 }
+
+                const advancePart = Math.round((paid - owedAmount) * 100) / 100;
+                rowY += 6;
+                docPdf.text(docDate, 15, rowY);
+                docPdf.text(dueDate, 40, rowY);
+                docPdf.text(user.fraction, 65, rowY);
+                docPdf.text(`Adiantamento para meses seguintes`, 85, rowY);
+                docPdf.text(advancePart.toFixed(2).replace('.', ','), 195, rowY, { align: "right" });
               }
             }
 
@@ -476,7 +529,6 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
                       type="number"
                       step="0.01"
                       min="0.01"
-                      max={paymentModal.owedAmount}
                       value={paymentAmount}
                       onChange={e => setPaymentAmount(e.target.value)}
                       className="w-full px-4 py-3 border border-slate-200 rounded-xl text-lg font-semibold text-center"
@@ -485,6 +537,11 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
                     {parseFloat(paymentAmount) < paymentModal.owedAmount - 0.01 && parseFloat(paymentAmount) > 0 && (
                       <p className="text-xs text-amber-600 mt-2 font-medium">
                         ⚠️ Pagamento parcial — {paymentModal.isExtra ? 'o valor restante ficará pendente nesta quota extra' : 'a diferença será adicionada ao próximo mês'}.
+                      </p>
+                    )}
+                    {parseFloat(paymentAmount) > paymentModal.owedAmount + 0.01 && (
+                      <p className="text-xs text-blue-600 mt-2 font-medium">
+                        💰 Pagamento com adiantamento — o excedente de {(parseFloat(paymentAmount) - paymentModal.owedAmount).toFixed(2)}€ será aplicado como crédito no(s) mês(es) seguinte(s).
                       </p>
                     )}
                   </div>
@@ -647,22 +704,31 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
                     const quota = quotas.find(q => q.firestoreId === `${user.firestoreId}_${monthKey}`);
                     const isPaid = quota && quota.status === 'paid';
                     const carryover = getCarryover(user.firestoreId, idx);
-                    const totalWithCarry = Math.round((baseTotal + carryover) * 100) / 100;
+                    const totalWithCarry = Math.max(Math.round((baseTotal + carryover) * 100) / 100, 0);
 
                     return (
                       <td key={idx} className="px-4 py-4 text-center">
                         <button 
-                          onClick={() => !isPaid && openPaymentModal(user.firestoreId, monthKey, false, totalWithCarry)}
-                          disabled={!isAdmin || isPaid}
-                          className={`w-full p-2 rounded-xl transition-all border ${isPaid ? 'bg-green-50 border-green-100 text-green-700 cursor-not-allowed opacity-100' : 'bg-white border-slate-100 text-slate-400 hover:border-blue-200'}`}
+                          onClick={() => !isPaid && totalWithCarry > 0 && openPaymentModal(user.firestoreId, monthKey, false, totalWithCarry)}
+                          disabled={!isAdmin || isPaid || totalWithCarry <= 0}
+                          className={`w-full p-2 rounded-xl transition-all border ${isPaid ? 'bg-green-50 border-green-100 text-green-700 cursor-not-allowed opacity-100' : totalWithCarry <= 0 ? 'bg-blue-50 border-blue-100 text-blue-600 cursor-not-allowed' : 'bg-white border-slate-100 text-slate-400 hover:border-blue-200'}`}
                         >
                           {isPaid ? (
                             <div className="flex flex-col items-center">
                               <CheckCircle className="w-4 h-4 mb-0.5" />
                               <span className="text-[10px] font-bold uppercase tracking-tight">Pago</span>
-                              {quota.paidAmount !== undefined && quota.paidAmount < totalWithCarry - 0.01 && (
+                              {quota.paidAmount !== undefined && quota.paidAmount < baseTotal + (quota.carryoverAmount || 0) - 0.01 && (
                                 <span className="text-[9px] text-amber-600 font-medium">{quota.paidAmount.toFixed(2)}€</span>
                               )}
+                              {quota.paidAmount !== undefined && quota.paidAmount > baseTotal + (quota.carryoverAmount || 0) + 0.01 && (
+                                <span className="text-[9px] text-blue-600 font-medium">{quota.paidAmount.toFixed(2)}€</span>
+                              )}
+                            </div>
+                          ) : totalWithCarry <= 0 ? (
+                            <div className="flex flex-col items-center">
+                              <CheckCircle className="w-4 h-4 mb-0.5 text-blue-500" />
+                              <span className="text-[10px] font-bold uppercase tracking-tight text-blue-600">Crédito</span>
+                              <span className="text-[9px] text-blue-500 font-medium">coberto</span>
                             </div>
                           ) : (
                             <div className="flex flex-col items-center opacity-60 group-hover:opacity-100">
@@ -671,6 +737,9 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
                                 <div>FR: {reserveFund.toFixed(2)}€</div>
                                 {carryover > 0.01 && (
                                   <div className="text-amber-600">+{carryover.toFixed(2)}€</div>
+                                )}
+                                {carryover < -0.01 && (
+                                  <div className="text-blue-600">{carryover.toFixed(2)}€</div>
                                 )}
                                 <div className="border-t border-slate-200 mt-1 pt-0.5 font-bold text-slate-600">Σ {totalWithCarry.toFixed(2)}€</div>
                               </div>
@@ -691,6 +760,8 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
         <span>Pago</span>
         <div className="w-3 h-3 bg-white border border-slate-100 rounded ml-4"></div>
         <span>Pendente (Q: Quota, FR: Fundo Reserva, Σ: Total)</span>
+        <div className="w-3 h-3 bg-blue-50 border border-blue-100 rounded ml-4"></div>
+        <span>Crédito (coberto por adiantamento)</span>
         <div className="w-3 h-3 bg-amber-50 border border-amber-200 rounded ml-4"></div>
         <span>Mês Extra (quota em atraso)</span>
       </div>
