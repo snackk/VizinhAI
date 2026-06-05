@@ -34,22 +34,44 @@ function UserDashboard({ user, quotas, expenses, budgets, users, assembleias, t 
     return !isPaid && (m.getFullYear() < now.getFullYear() || (m.getFullYear() === now.getFullYear() && m.getMonth() <= now.getMonth()));
   });
 
-  // Calculate carryover from partial payments
+  // Calculate carryover from partial/over payments
   let partialPaymentCarry = 0;
+  // Check credit from overpaid extra quotas
+  const userExtraQuotas = quotas.filter(q => q.isExtra && q.userId === user.firestoreId && q.status === 'paid' && !q.isPartialPayment);
+  for (const eq of userExtraQuotas) {
+    const extraAmount = eq.extraAmount || 0;
+    const paidAmount = eq.paidAmount || 0;
+    const extraOverpayment = Math.round((paidAmount - extraAmount) * 100) / 100;
+    if (extraOverpayment > 0.01) {
+      partialPaymentCarry -= extraOverpayment;
+    }
+  }
+
   months.forEach((m, idx) => {
     const monthKey = `${m.getFullYear()}-${m.getMonth()}`;
     const quota = quotas.find(q => q.firestoreId === `${user.firestoreId}_${monthKey}`);
     if (quota && quota.status === 'paid' && quota.paidAmount !== undefined) {
-      const expectedWithCarry = totalMonthly + partialPaymentCarry;
-      const deficit = expectedWithCarry - quota.paidAmount;
+      const expectedWithCarry = Math.max(totalMonthly + partialPaymentCarry, 0);
+      const diff = Math.round((expectedWithCarry - quota.paidAmount) * 100) / 100;
       // Reserve fund is fixed and does NOT carry over - only quota base deficit carries
-      if (deficit > 0.01) {
-        partialPaymentCarry = Math.min(deficit, quotaBase + partialPaymentCarry);
+      if (diff > 0.01) {
+        partialPaymentCarry = Math.round(Math.min(diff, Math.max(quotaBase + partialPaymentCarry, 0)) * 100) / 100;
+      } else if (diff < -0.01) {
+        // Overpayment: credit carries to next month (negative carry)
+        partialPaymentCarry = diff;
       } else {
         partialPaymentCarry = 0;
       }
     } else if (!quota || quota.status !== 'paid') {
-      // unpaid month - carry stays
+      // Unpaid month: absorbs carry (debt shows here, credit reduces here)
+      if (partialPaymentCarry > 0.01) {
+        // Debt absorbed by this unpaid month (already counted in debtMonths), reset
+        partialPaymentCarry = 0;
+      } else if (partialPaymentCarry < -0.01) {
+        // Credit absorbs this month's cost
+        partialPaymentCarry = Math.round((partialPaymentCarry + totalMonthly) * 100) / 100;
+        if (partialPaymentCarry > 0) partialPaymentCarry = 0;
+      }
     } else {
       partialPaymentCarry = 0;
     }
@@ -59,7 +81,7 @@ function UserDashboard({ user, quotas, expenses, budgets, users, assembleias, t 
   const extraPendingQuotas = quotas.filter(q => q.isExtra && q.userId === user.firestoreId && q.status === 'pending' && !q.isPartialPayment);
   const extraDebtAmount = extraPendingQuotas.reduce((sum, q) => sum + (q.extraAmount || 0), 0);
 
-  const pendingAmount = (debtMonths.length * totalMonthly) + extraDebtAmount + partialPaymentCarry;
+  const pendingAmount = Math.max((debtMonths.length * totalMonthly) + extraDebtAmount + partialPaymentCarry, 0);
   const hasDebt = pendingAmount > 0.01;
   return (
     <div className="space-y-6">
