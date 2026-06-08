@@ -211,12 +211,22 @@ service firebase.storage {
       );
     }
 
-    // Protect documents per condo
+    // Condo documents (atas, seguros, contratos, etc.)
     match /condos/{condoId}/documents/{fileName} {
       allow read: if isMember(condoId);
-      allow write: if isAdmin(condoId)
+      allow create, update: if isAdmin(condoId)
                    && request.resource.size < 50 * 1024 * 1024 
                    && request.resource.contentType.matches('(application/pdf|image/.*|application/zip)');
+      allow delete: if isAdmin(condoId);
+    }
+
+    // Expense invoices (faturas anexadas a despesas)
+    match /condos/{condoId}/expenses/{fileName} {
+      allow read: if isMember(condoId);
+      allow create, update: if isAdmin(condoId)
+                   && request.resource.size < 50 * 1024 * 1024 
+                   && request.resource.contentType.matches('(application/pdf|image/.*|application/zip)');
+      allow delete: if isAdmin(condoId);
     }
   }
 }

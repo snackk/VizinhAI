@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { FolderOpen, UploadCloud, X, Settings, FileText, Download, Edit2, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 
 function DocumentsPage({ documents, docTypes, isAdmin, currentUser, db, appId, storage, selectedCondoId }) {
@@ -94,10 +94,14 @@ function DocumentsPage({ documents, docTypes, isAdmin, currentUser, db, appId, s
     }
   };
 
-  const handleDeleteDoc = async (docId) => {
+  const handleDeleteDoc = async (docItem) => {
     if (!confirm('Tem a certeza que deseja eliminar este documento?')) return;
     try {
-      await deleteDoc(doc(db, 'condos', selectedCondoId, 'documents', docId));
+      if (docItem.fileName) {
+        const fileRef = ref(storage, `condos/${selectedCondoId}/documents/${docItem.fileName}`);
+        await deleteObject(fileRef).catch(() => {});
+      }
+      await deleteDoc(doc(db, 'condos', selectedCondoId, 'documents', docItem.firestoreId));
     } catch (err) {
       alert('Erro ao eliminar documento: ' + err.message);
     }
@@ -168,7 +172,7 @@ function DocumentsPage({ documents, docTypes, isAdmin, currentUser, db, appId, s
               <label className="text-xs font-semibold text-slate-500 ml-1 uppercase">Tipo</label>
               <select required value={selectedType} onChange={e => setSelectedType(e.target.value)} className="w-full px-4 py-3 border border-slate-200 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 appearance-none">
                 <option value="">Selecionar tipo...</option>
-                {docTypes.map(type => <option key={type.firestoreId} value={type.name}>{type.name}</option>)}
+                {[...docTypes].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt')).map(type => <option key={type.firestoreId} value={type.name}>{type.name}</option>)}
               </select>
             </div>
             {!editingDoc && (
@@ -235,7 +239,7 @@ function DocumentsPage({ documents, docTypes, isAdmin, currentUser, db, appId, s
                           <button onClick={(e) => { e.stopPropagation(); handleEditDoc(d); }} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                             <Edit2 className="w-4 h-4" />
                           </button>
-                          <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(d.firestoreId); }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                          <button onClick={(e) => { e.stopPropagation(); handleDeleteDoc(d); }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </>

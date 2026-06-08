@@ -167,11 +167,18 @@ function BudgetsPage({ budgets, users, isAdmin, db, appId, selectedCondoId }) {
           <h2 className="text-[26px] font-bold text-slate-800">Orçamentos</h2>
           <p className="text-slate-500 text-sm mt-1">Gestão de orçamentos e exercício</p>
         </div>
-        {isAdmin && (
-          <button onClick={() => { setShowForm(!showForm); setEditingBudget(null); }} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-3 rounded-xl font-semibold active:bg-blue-700 transition-colors">
-            {showForm ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />} {showForm ? 'Cancelar' : 'Novo Orçamento'}
-          </button>
-        )}
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {isAdmin && sortedBudgets.length > 0 && (
+            <button onClick={() => handleExportExcel(sortedBudgets[0])} title="Exportar Excel" className="flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-3 rounded-xl font-semibold active:bg-green-700 transition-colors shadow-lg shadow-green-600/20">
+              <FileSpreadsheet className="w-5 h-5" />
+            </button>
+          )}
+          {isAdmin && (
+            <button onClick={() => { setShowForm(!showForm); setEditingBudget(null); }} className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-3 rounded-xl font-semibold active:bg-blue-700 transition-colors">
+              {showForm ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />} {showForm ? 'Cancelar' : 'Novo Orçamento'}
+            </button>
+          )}
+        </div>
       </div>
 
       {showForm && isAdmin && (
@@ -249,9 +256,6 @@ function BudgetsPage({ budgets, users, isAdmin, db, appId, selectedCondoId }) {
                   <div className="flex items-center gap-2">
                     {isAdmin && (
                       <>
-                        <button onClick={(e) => { e.stopPropagation(); handleExportExcel(budget); }} className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-lg" title="Exportar Excel">
-                          <FileSpreadsheet className="w-4 h-4" />
-                        </button>
                         <button onClick={(e) => { e.stopPropagation(); setEditingBudget(budget); }} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Edit2 className="w-4 h-4" /></button>
                         <button onClick={(e) => { e.stopPropagation(); handleDelete(budget.firestoreId); }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
                       </>

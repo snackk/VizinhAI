@@ -151,7 +151,7 @@ function UserDashboard({ user, quotas, expenses, budgets, users, assembleias, t 
                   <div>
                     <p className="font-semibold text-slate-800">{a.numero ? `Assembleia ${a.numero}` : 'Assembleia'}{a.tipo === 'extraordinaria' ? ' (Extraordinária)' : ' (Geral)'}</p>
                     <p className="text-sm text-slate-500">
-                      {new Date(a.data).toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' })}
+                      {new Date(a.data).toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' }).replace(/ [A-Z][a-z]+ /g, (m) => m.toLowerCase())}
                       {a.hora ? ` às ${a.hora}` : ''}
                     </p>
                   </div>
