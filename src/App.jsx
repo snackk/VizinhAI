@@ -58,6 +58,7 @@ function App() {
   const [budgets, setBudgets] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [docTypes, setDocTypes] = useState([]);
+  const [expenseTypes, setExpenseTypes] = useState([]);
   const [assembleias, setAssembleias] = useState([]);
   const [condo, setCondo] = useState(null);
 
@@ -117,7 +118,7 @@ function App() {
 
   useEffect(() => {
     if (!firebaseUser || !selectedCondoId) {
-      setUsers([]); setQuotas([]); setExpenses([]); setBudgets([]); setDocuments([]); setDocTypes([]); setAssembleias([]); setCondo(null);
+      setUsers([]); setQuotas([]); setExpenses([]); setBudgets([]); setDocuments([]); setDocTypes([]); setExpenseTypes([]); setAssembleias([]); setCondo(null);
       return;
     }
 
@@ -129,6 +130,7 @@ function App() {
     const unsubBudgets = onSnapshot(getCol('budgets'), (snap) => setBudgets(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))), (err) => console.error("Erro budgets:", err));
     const unsubDocs = onSnapshot(getCol('documents'), (snap) => setDocuments(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))), (err) => console.error("Erro docs:", err));
     const unsubDocTypes = onSnapshot(getCol('docTypes'), (snap) => setDocTypes(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))), (err) => console.error("Erro docTypes:", err));
+    const unsubExpenseTypes = onSnapshot(getCol('expenseTypes'), (snap) => setExpenseTypes(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))), (err) => console.error("Erro expenseTypes:", err));
     const unsubAssembleias = onSnapshot(getCol('assembleias'), (snap) => setAssembleias(snap.docs.map(d => ({ firestoreId: d.id, ...d.data() }))), (err) => console.error("Erro assembleias:", err));
     const unsubCondo = onSnapshot(doc(db, 'condos', selectedCondoId), (docSnap) => {
       if (docSnap.exists()) {
@@ -143,7 +145,7 @@ function App() {
       }
     }, (err) => console.error("Erro userInCondo:", err));
 
-    return () => { unsubUsers(); unsubQuotas(); unsubExpenses(); unsubBudgets(); unsubDocs(); unsubDocTypes(); unsubAssembleias(); unsubCondo(); unsubUserInCondo(); };
+    return () => { unsubUsers(); unsubQuotas(); unsubExpenses(); unsubBudgets(); unsubDocs(); unsubDocTypes(); unsubExpenseTypes(); unsubAssembleias(); unsubCondo(); unsubUserInCondo(); };
   }, [firebaseUser, selectedCondoId]);
 
   const handleLogout = () => signOut(auth);
@@ -188,7 +190,7 @@ function App() {
       case 'dashboard': return isAdmin ? <AdminDashboard expenses={expenses} quotas={quotas} users={users} budgets={budgets} assembleias={assembleias} t={t} /> : <UserDashboard user={currentUser} quotas={quotas} expenses={expenses} budgets={budgets} users={users} assembleias={assembleias} t={t} />;
       case 'condo': return <CondoPage condo={condo} isAdmin={isAdmin} db={db} appId={appId} users={users} t={t} selectedCondoId={effectiveCondoId} />;
       case 'documentos': return <DocumentsPage documents={documents} docTypes={docTypes} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} storage={storage} selectedCondoId={effectiveCondoId} />;
-      case 'despesas': return <ExpensesPage expenses={expenses} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} selectedCondoId={effectiveCondoId} />;
+      case 'despesas': return <ExpensesPage expenses={expenses} budgets={budgets} expenseTypes={expenseTypes} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} storage={storage} selectedCondoId={effectiveCondoId} />;
       case 'orcamentos': return <BudgetsPage budgets={budgets} users={users} isAdmin={isAdmin} db={db} appId={appId} selectedCondoId={effectiveCondoId} />;
       case 'conta-corrente': return isAdmin ? <CurrentAccountPage budgets={budgets} users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} condo={condo} t={t} selectedCondoId={effectiveCondoId} /> : null;
       case 'fracoes': return <FractionsPage users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} budgets={budgets} currentUser={currentUser} t={t} selectedCondoId={effectiveCondoId} />;

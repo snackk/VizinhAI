@@ -337,7 +337,7 @@ function AssembleiasPage({ db, t, selectedCondoId, users, condo, currentUser }) 
           {assembleias.map(a => {
             const isExpanded = expandedId === a.firestoreId;
             const dateObj = a.data ? new Date(a.data) : null;
-            const dateFormatted = dateObj ? dateObj.toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' }) : '';
+            const dateFormatted = dateObj ? dateObj.toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' }).replace(/ [A-Z][a-z]+ /g, (m) => m.toLowerCase()) : '';
             return (
               <div key={a.firestoreId} className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
                 <button

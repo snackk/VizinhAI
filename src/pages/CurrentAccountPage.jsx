@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { jsPDF } from 'jspdf';
 import { setDoc, doc, collection, addDoc, runTransaction, getDocs, deleteDoc, updateDoc } from 'firebase/firestore';
-import { Wallet, CheckCircle, PlusCircle, X, Trash2 } from 'lucide-react';
+import { Wallet, CheckCircle, PlusCircle, X, Trash2, FileSpreadsheet } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo, t, selectedCondoId }) {
   const [showExtraForm, setShowExtraForm] = useState(false);
@@ -480,6 +481,50 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
     setPaymentLoading(false);
   };
 
+  const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+  const handleExportExcel = () => {
+    const sortedUsers = [...users].sort((a, b) => (a.fraction || '').localeCompare(b.fraction || '', 'pt'));
+
+    // Header row: Fração | Month1 | Month2 | ...
+    const header = ['Fração', ...months.map(m => `${monthNames[m.getMonth()]} ${m.getFullYear()}`)];
+    const data = [header];
+
+    for (const user of sortedUsers) {
+      const perm = parseFloat(user.permilagem) || 0;
+      const quotaBase = Math.round((monthlyTotal * (perm / 1000)) * 100) / 100;
+      const reserveFund = Math.round((quotaBase * (rfPerc / 100)) * 100) / 100;
+      const baseTotal = Math.round((quotaBase + reserveFund) * 100) / 100;
+
+      const row = [user.fraction || user.name || user.firestoreId];
+
+      for (let idx = 0; idx < months.length; idx++) {
+        const m = months[idx];
+        const monthKey = `${m.getFullYear()}-${m.getMonth()}`;
+        const quota = quotas.find(q => q.firestoreId === `${user.firestoreId}_${monthKey}`);
+        const isPaid = quota && quota.status === 'paid';
+
+        if (isPaid) {
+          const paidAmount = quota.paidAmount !== undefined ? quota.paidAmount : baseTotal;
+          row.push(Number(paidAmount).toFixed(2));
+        } else {
+          row.push('--');
+        }
+      }
+
+      data.push(row);
+    }
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = [{ wch: 25 }, ...months.map(() => ({ wch: 16 }))];
+    XLSX.utils.book_append_sheet(wb, ws, 'Conta Corrente');
+
+    const startYear = new Date(currentBudget.startDate).getFullYear();
+    const endYear = new Date(currentBudget.endDate).getFullYear();
+    XLSX.writeFile(wb, `Conta_Corrente_${startYear}-${endYear}.xlsx`);
+  };
+
   return (
     <div className="space-y-6">
       <div className="pt-2 flex items-center justify-between">
@@ -487,15 +532,26 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
           <h2 className="text-[26px] font-bold text-slate-800">Conta Corrente</h2>
           <p className="text-slate-500 text-sm mt-1">Controlo de quotas pagas por condómino</p>
         </div>
-        {isAdmin && (
-          <button
-            onClick={() => setShowExtraForm(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-2xl text-sm font-semibold hover:bg-blue-700 transition-colors"
-          >
-            <PlusCircle className="w-4 h-4" />
-            Mês Extra
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <button
+              onClick={handleExportExcel}
+              title="Exportar Excel"
+              className="flex items-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-2xl text-sm font-semibold hover:bg-green-700 transition-colors shadow-lg shadow-green-600/20"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              onClick={() => setShowExtraForm(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-2xl text-sm font-semibold hover:bg-blue-700 transition-colors"
+            >
+              <PlusCircle className="w-4 h-4" />
+              Mês Extra
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Payment Modal */}
