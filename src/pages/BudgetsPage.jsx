@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
-import { Plus, X, Wallet, Edit2, Trash2, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, X, Wallet, Edit2, Trash2, Calendar, ChevronDown, ChevronUp, FileSpreadsheet } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
-function BudgetsPage({ budgets, isAdmin, db, appId, selectedCondoId }) {
+function BudgetsPage({ budgets, users, isAdmin, db, appId, selectedCondoId }) {
   const [showForm, setShowForm] = useState(false);
   const [editingBudget, setEditingBudget] = useState(null);
   const [startDate, setStartDate] = useState('');
@@ -71,6 +72,92 @@ function BudgetsPage({ budgets, isAdmin, db, appId, selectedCondoId }) {
     } catch (err) {
       alert('Erro ao eliminar: ' + err.message);
     }
+  };
+
+  const getMonths = (start, end) => {
+    const months = [];
+    let current = new Date(start);
+    const last = new Date(end);
+    while (current <= last) {
+      months.push(new Date(current));
+      current.setMonth(current.getMonth() + 1);
+    }
+    return months;
+  };
+
+  const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+  const handleExportExcel = (budget) => {
+    const wb = XLSX.utils.book_new();
+    const rfPerc = budget.reserveFundPercentage ?? 10;
+
+    // --- Table 1: Rubrics ---
+    const rubricsData = [
+      ['Rubrica', 'Valor (€)'],
+      ...[...budget.rubrics].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt')).map(r => [r.name, Number(r.value).toFixed(2)]),
+      [],
+      ['Fundo de Reserva (%)', `${rfPerc}%`],
+      ['Valor Fundo de Reserva (€)', (budget.totalAmount * (rfPerc / 100)).toFixed(2)],
+      [],
+      ['Total do Exercício (+ FR)', budget.totalAmount.toFixed(2)],
+      ['Total do Exercício (c/ FR)', (budget.totalAmount * (1 + rfPerc / 100)).toFixed(2)],
+    ];
+
+    const wsRubrics = XLSX.utils.aoa_to_sheet(rubricsData);
+    wsRubrics['!cols'] = [{ wch: 35 }, { wch: 15 }];
+    XLSX.utils.book_append_sheet(wb, wsRubrics, 'Rubricas');
+
+    // --- Table 2: Fractions per month ---
+    const months = getMonths(budget.startDate, budget.endDate);
+    const monthlyTotal = budget.totalAmount / 12;
+
+    // Sort users alphabetically by fraction name
+    const sortedUsers = [...(users || [])].sort((a, b) => (a.fraction || a.name || '').localeCompare(b.fraction || b.name || '', 'pt'));
+
+    // Header row: Fração | Jan 2025 | Feb 2025 | ... | Total
+    const header = ['Fração', 'Permilagem', ...months.map(m => `${monthNames[m.getMonth()]} ${m.getFullYear()}`), 'Total Anual'];
+    const fractionsData = [header];
+
+    for (const user of sortedUsers) {
+      const perm = parseFloat(user.permilagem) || 0;
+      const quotaBase = Math.round((monthlyTotal * (perm / 1000)) * 100) / 100;
+      const rf = Math.round((quotaBase * (rfPerc / 100)) * 100) / 100;
+      const monthlyQuota = Math.round((quotaBase + rf) * 100) / 100;
+
+      const row = [
+        user.fraction || user.name || user.firestoreId,
+        perm,
+        ...months.map(() => monthlyQuota.toFixed(2)),
+        (monthlyQuota * months.length).toFixed(2)
+      ];
+      fractionsData.push(row);
+    }
+
+    // Total row
+    const totalRow = ['TOTAL', '', ...months.map(() => {
+      const totalMonth = sortedUsers.reduce((sum, user) => {
+        const perm = parseFloat(user.permilagem) || 0;
+        const qBase = Math.round((monthlyTotal * (perm / 1000)) * 100) / 100;
+        const rfVal = Math.round((qBase * (rfPerc / 100)) * 100) / 100;
+        return sum + qBase + rfVal;
+      }, 0);
+      return totalMonth.toFixed(2);
+    }), sortedUsers.reduce((sum, user) => {
+      const perm = parseFloat(user.permilagem) || 0;
+      const qBase = Math.round((monthlyTotal * (perm / 1000)) * 100) / 100;
+      const rfVal = Math.round((qBase * (rfPerc / 100)) * 100) / 100;
+      return sum + (qBase + rfVal) * months.length;
+    }, 0).toFixed(2)];
+    fractionsData.push(totalRow);
+
+    const wsFractions = XLSX.utils.aoa_to_sheet(fractionsData);
+    wsFractions['!cols'] = [{ wch: 25 }, { wch: 12 }, ...months.map(() => ({ wch: 14 })), { wch: 14 }];
+    XLSX.utils.book_append_sheet(wb, wsFractions, 'Frações - Quotas Mensais');
+
+    // Generate file
+    const startYear = new Date(budget.startDate).getFullYear();
+    const endYear = new Date(budget.endDate).getFullYear();
+    XLSX.writeFile(wb, `Orcamento_${startYear}-${endYear}.xlsx`);
   };
 
   return (
@@ -162,6 +249,9 @@ function BudgetsPage({ budgets, isAdmin, db, appId, selectedCondoId }) {
                   <div className="flex items-center gap-2">
                     {isAdmin && (
                       <>
+                        <button onClick={(e) => { e.stopPropagation(); handleExportExcel(budget); }} className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-lg" title="Exportar Excel">
+                          <FileSpreadsheet className="w-4 h-4" />
+                        </button>
                         <button onClick={(e) => { e.stopPropagation(); setEditingBudget(budget); }} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Edit2 className="w-4 h-4" /></button>
                         <button onClick={(e) => { e.stopPropagation(); handleDelete(budget.firestoreId); }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
                       </>
@@ -216,4 +306,3 @@ function BudgetsPage({ budgets, isAdmin, db, appId, selectedCondoId }) {
 }
 
 export default BudgetsPage;
-
