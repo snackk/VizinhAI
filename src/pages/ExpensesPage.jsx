@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { Plus, X, Receipt, Edit2, Trash2, Calendar, ChevronDown, ChevronUp, FileSpreadsheet, Settings, Paperclip, Download } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 import * as XLSX from 'xlsx';
 
 function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, db, appId, storage, selectedCondoId }) {
@@ -14,6 +15,7 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
   const [value, setValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [expandedMonths, setExpandedMonths] = useState({});
+  const [expandedPeriods, setExpandedPeriods] = useState({});
   const [newTypeName, setNewTypeName] = useState('');
   const [file, setFile] = useState(null);
 
@@ -121,7 +123,7 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
 
   const groupedExpenses = expenses.reduce((acc, expense) => {
     const d = new Date(expense.date);
-    const monthYear = d.toLocaleString('pt', { month: 'long', year: 'numeric' }).replace(/ [A-Z][a-z]+ /g, (m) => m.toLowerCase());
+    const monthYear = d.toLocaleString('pt', { month: 'long', year: 'numeric' }).replace(/\b[A-Z][a-z]+\b/g, (m) => m.toLowerCase());
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     if (!acc[key]) acc[key] = { label: monthYear, items: [], total: 0 };
     acc[key].items.push(expense);
@@ -131,6 +133,112 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
 
   const sortedKeys = Object.keys(groupedExpenses).sort((a, b) => b.localeCompare(a));
   const currentMonthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+
+  // Build budget periods sorted by startDate descending
+  const sortedBudgetPeriods = useMemo(() => {
+    const sorted = [...(budgets || [])].sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+    return sorted.map(b => {
+      const start = new Date(b.startDate);
+      const end = new Date(b.endDate);
+      const startMonth = new Date(start.getFullYear(), start.getMonth(), 1);
+      const endMonth = new Date(end.getFullYear(), end.getMonth() + 1, 0);
+      const startLabel = start.toLocaleString('pt', { month: 'short', year: 'numeric' }).replace('.', '');
+      const endLabel = end.toLocaleString('pt', { month: 'short', year: 'numeric' }).replace('.', '');
+      return {
+        id: b.firestoreId,
+        label: `${startLabel} — ${endLabel}`,
+        startMonth,
+        endMonth,
+        totalBudget: b.totalAmount || (b.rubrics || []).reduce((s, r) => s + (r.value || 0), 0),
+      };
+    });
+  }, [budgets]);
+
+  // Group month keys by budget period; expenses outside any budget go to "Sem Orçamento"
+  const periodGroups = useMemo(() => {
+    const groups = {};
+    const now = new Date();
+
+    // Initialize a group for each budget period
+    sortedBudgetPeriods.forEach(bp => {
+      groups[bp.id] = { ...bp, months: [], total: 0, isCurrent: now >= bp.startMonth && now <= bp.endMonth };
+    });
+
+    // Assign each month to the matching budget period
+    const unmatched = { id: '__none__', label: 'Sem Orçamento', months: [], total: 0, isCurrent: false };
+    sortedKeys.forEach(key => {
+      const [y, m] = key.split('-');
+      const monthDate = new Date(parseInt(y), parseInt(m) - 1, 15); // mid-month for safe comparison
+      let matched = false;
+      for (const bp of sortedBudgetPeriods) {
+        if (monthDate >= bp.startMonth && monthDate <= bp.endMonth) {
+          groups[bp.id].months.push(key);
+          groups[bp.id].total += groupedExpenses[key].total;
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) {
+        unmatched.months.push(key);
+        unmatched.total += groupedExpenses[key].total;
+      }
+    });
+
+    // Build ordered array: budget periods (newest first), then unmatched at the end if any
+    const ordered = sortedBudgetPeriods.map(bp => groups[bp.id]).filter(g => g.months.length > 0);
+    if (unmatched.months.length > 0) ordered.push(unmatched);
+    return ordered;
+  }, [sortedBudgetPeriods, sortedKeys, groupedExpenses]);
+
+  // Chart data: cumulative expenses vs budget regression line
+  const chartData = useMemo(() => {
+    const sortedBudgets = [...(budgets || [])].sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+    const latestBudget = sortedBudgets[0];
+    if (!latestBudget) return null;
+
+    const start = new Date(latestBudget.startDate);
+    const end = new Date(latestBudget.endDate);
+    const totalBudget = latestBudget.totalAmount || (latestBudget.rubrics || []).reduce((s, r) => s + (r.value || 0), 0);
+
+    // Generate all months in the budget period
+    const months = [];
+    const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+    const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
+    while (cursor <= endMonth) {
+      months.push({
+        year: cursor.getFullYear(),
+        month: cursor.getMonth(),
+        key: `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`
+      });
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    const totalMonths = months.length;
+    const monthlyBudget = totalBudget / totalMonths;
+
+    // Calculate cumulative actual expenses per month
+    let cumulativeActual = 0;
+    const data = months.map((m, idx) => {
+      const monthExpenses = expenses.filter(exp => {
+        const d = new Date(exp.date);
+        return d.getFullYear() === m.year && d.getMonth() === m.month;
+      });
+      const monthTotal = monthExpenses.reduce((s, e) => s + (e.amount || 0), 0);
+      cumulativeActual += monthTotal;
+
+      const cumulativeBudget = Math.round(monthlyBudget * (idx + 1) * 100) / 100;
+      const label = new Date(m.year, m.month).toLocaleString('pt', { month: 'short' }).replace('.', '');
+
+      return {
+        name: label,
+        key: m.key,
+        'Gasto Real': Math.round(cumulativeActual * 100) / 100,
+        'Orçamentado': cumulativeBudget,
+      };
+    });
+
+    return { data, totalBudget };
+  }, [budgets, expenses]);
 
   const handleExportExcel = () => {
     // Get the latest budget (sorted by startDate descending)
@@ -293,85 +401,134 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
               {loading ? 'A processar...' : editingExpense ? 'Atualizar Despesa' : 'Registar Despesa'}
             </button>
           </div>
-        </form>
+         </form>
+      )}
+
+      {/* Chart: Cumulative expenses vs budget */}
+      {chartData && chartData.data.length > 0 && (
+        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+          <div className="mb-4">
+            <h3 className="font-bold text-lg text-slate-800">Despesas vs Orçamento</h3>
+            <p className="text-xs text-slate-500 mt-1">Evolução cumulativa dos gastos reais face ao orçamentado ({chartData.totalBudget.toFixed(2)} €)</p>
+          </div>
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={chartData.data} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
+              <YAxis tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} tickFormatter={(v) => `${v}€`} />
+              <Tooltip formatter={(value) => [`${Number(value).toFixed(2)} €`]} contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }} />
+              <Legend wrapperStyle={{ paddingTop: '12px' }} />
+              <Line type="monotone" dataKey="Orçamentado" stroke="#94a3b8" strokeWidth={2} strokeDasharray="6 4" dot={false} />
+              <Line type="monotone" dataKey="Gasto Real" stroke="#2563eb" strokeWidth={3} dot={{ fill: '#2563eb', r: 4 }} activeDot={{ r: 6 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
       )}
 
       <div className="space-y-4">
-        {sortedKeys.map((key) => {
-          const group = groupedExpenses[key];
-          const isCurrent = key === currentMonthKey;
-          const isExpanded = expandedMonths[key] !== undefined ? expandedMonths[key] : isCurrent;
+        {periodGroups.map((period) => {
+          const isPeriodExpanded = expandedPeriods[period.id] || false;
 
           return (
-            <div key={key} className={`bg-white rounded-3xl border ${isCurrent ? 'border-blue-100 ring-1 ring-blue-50' : 'border-slate-100'} shadow-sm overflow-hidden transition-all`}>
-              <div className={`p-5 flex justify-between items-center cursor-pointer transition-colors ${!isExpanded ? 'hover:bg-slate-50' : ''}`} onClick={() => setExpandedMonths({...expandedMonths, [key]: !isExpanded})}>
+            <div key={period.id} className={`bg-white rounded-3xl border ${period.isCurrent ? 'border-blue-100 ring-1 ring-blue-50' : 'border-slate-100'} shadow-sm overflow-hidden`}>
+              <div className={`p-5 flex justify-between items-center cursor-pointer transition-colors ${!isPeriodExpanded ? 'hover:bg-slate-50' : ''}`} onClick={() => setExpandedPeriods({...expandedPeriods, [period.id]: !isPeriodExpanded})}>
                 <div className="flex items-center gap-4">
-                  <div className={`p-3 rounded-2xl ${isCurrent ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-100 text-slate-500'}`}>
+                  <div className={`p-3 rounded-2xl ${period.isCurrent ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-100 text-slate-500'}`}>
                     <Calendar className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-800 capitalize">{group.label}</h3>
-                    <p className="text-xs text-slate-500">{group.items.length} despesas registadas</p>
+                    <h3 className="font-bold text-slate-800 text-lg capitalize">{period.label}</h3>
+                    <p className="text-xs text-slate-500">{period.months.length} {period.months.length === 1 ? 'mês' : 'meses'} com despesas{period.totalBudget ? ` · Orçamento: ${period.totalBudget.toFixed(2)} €` : ''}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-6">
                   <div className="text-right hidden sm:block">
-                    <p className="text-xs font-semibold uppercase text-slate-400 tracking-wider">Total Mensal</p>
-                    <p className={`font-bold ${isCurrent ? 'text-blue-600' : 'text-slate-900'}`}>{group.total.toFixed(2)} €</p>
+                    <p className="text-xs font-semibold uppercase text-slate-400 tracking-wider">Total Período</p>
+                    <p className={`font-bold text-lg ${period.isCurrent ? 'text-blue-600' : 'text-slate-900'}`}>{period.total.toFixed(2)} €</p>
                   </div>
-                  {isExpanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+                  {isPeriodExpanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
                 </div>
               </div>
 
-              {isExpanded && (
-                <div className="px-5 pb-6 animate-in fade-in duration-300">
-                  <div className="bg-slate-50 rounded-2xl overflow-hidden border border-slate-100">
-                    <table className="w-full text-left text-sm">
-                      <thead>
-                        <tr className="bg-slate-100/50 text-slate-500 border-b border-slate-200">
-                          <th className="px-4 py-3.5 font-semibold">Data</th>
-                          <th className="px-4 py-3.5 font-semibold">Tipo</th>
-                          <th className="px-4 py-3.5 font-semibold">Rubrica</th>
-                          <th className="px-4 py-3.5 font-semibold text-right">Valor</th>
-                          <th className="px-4 py-3.5 font-semibold text-center">Fatura</th>
-                          {isAdmin && <th className="px-4 py-3.5 font-semibold text-center w-24">Ações</th>}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {group.items.sort((a,b) => new Date(b.date) - new Date(a.date)).map((item) => (
-                          <tr key={item.firestoreId} className="hover:bg-white/50 transition-colors">
-                            <td className="px-4 py-3.5 text-slate-500 font-medium">{new Date(item.date).toLocaleDateString('pt')}</td>
-                            <td className="px-4 py-3.5 text-slate-500 text-xs">{item.expenseType ? <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-lg font-semibold">{item.expenseType}</span> : <span className="text-slate-300">—</span>}</td>
-                            <td className="px-4 py-3.5 text-slate-700 font-bold">{item.rubric}</td>
-                            <td className="px-4 py-3.5 text-slate-900 font-black text-right">{item.amount.toFixed(2)} €</td>
-                            <td className="px-4 py-3.5 text-center">
-                              {item.invoiceUrl ? (
-                                <a href={item.invoiceUrl} target="_blank" rel="noopener noreferrer" title={item.invoiceFileName?.replace(/^\d+_/, '') || 'Fatura'} className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 transition-colors">
-                                  <Download className="w-4 h-4" />
-                                </a>
-                              ) : (
-                                <span className="text-slate-300">—</span>
-                              )}
-                            </td>
-                            {isAdmin && (
-                              <td className="px-4 py-3.5">
-                                <div className="flex items-center justify-center gap-1">
-                                  <button onClick={() => setEditingExpense(item)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
-                                  <button onClick={() => handleDelete(item.firestoreId)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
-                                </div>
-                              </td>
-                            )}
-                          </tr>
-                        ))}
-                        <tr className="bg-blue-50/30">
-                          <td colSpan="3" className="px-4 py-4 text-blue-900 font-bold text-right">Total do Mês</td>
-                          <td className="px-4 py-4 text-blue-700 font-black text-right text-lg">{group.total.toFixed(2)} €</td>
-                          <td></td>
-                          {isAdmin && <td></td>}
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+              {isPeriodExpanded && (
+                <div className="px-4 pb-4 space-y-3 animate-in fade-in duration-300">
+                  {period.months.map((key) => {
+                    const group = groupedExpenses[key];
+                    const isCurrent = key === currentMonthKey;
+                    const isExpanded = expandedMonths[key] !== undefined ? expandedMonths[key] : isCurrent;
+
+                    return (
+                      <div key={key} className={`rounded-2xl border ${isCurrent ? 'border-blue-100' : 'border-slate-100'} overflow-hidden bg-slate-50/50`}>
+                        <div className={`px-4 py-3.5 flex justify-between items-center cursor-pointer transition-colors ${!isExpanded ? 'hover:bg-slate-100/50' : ''}`} onClick={() => setExpandedMonths({...expandedMonths, [key]: !isExpanded})}>
+                          <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-xl ${isCurrent ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-400'}`}>
+                              <Receipt className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <h4 className="font-semibold text-slate-700 capitalize text-sm">{group.label}</h4>
+                              <p className="text-xs text-slate-400">{group.items.length} despesas</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <p className={`font-bold text-sm ${isCurrent ? 'text-blue-600' : 'text-slate-700'}`}>{group.total.toFixed(2)} €</p>
+                            {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                          </div>
+                        </div>
+
+                        {isExpanded && (
+                          <div className="px-4 pb-4 animate-in fade-in duration-300">
+                            <div className="bg-white rounded-xl overflow-hidden border border-slate-100">
+                              <table className="w-full text-left text-sm">
+                                <thead>
+                                  <tr className="bg-slate-100/50 text-slate-500 border-b border-slate-200">
+                                    <th className="px-4 py-3 font-semibold">Data</th>
+                                    <th className="px-4 py-3 font-semibold">Tipo</th>
+                                    <th className="px-4 py-3 font-semibold">Rubrica</th>
+                                    <th className="px-4 py-3 font-semibold text-right">Valor</th>
+                                    <th className="px-4 py-3 font-semibold text-center">Fatura</th>
+                                    {isAdmin && <th className="px-4 py-3 font-semibold text-center w-24">Ações</th>}
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                  {group.items.sort((a,b) => new Date(b.date) - new Date(a.date)).map((item) => (
+                                    <tr key={item.firestoreId} className="hover:bg-slate-50/50 transition-colors">
+                                      <td className="px-4 py-3 text-slate-500 font-medium">{new Date(item.date).toLocaleDateString('pt')}</td>
+                                      <td className="px-4 py-3 text-slate-500 text-xs">{item.expenseType ? <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-lg font-semibold">{item.expenseType}</span> : <span className="text-slate-300">—</span>}</td>
+                                      <td className="px-4 py-3 text-slate-700 font-bold">{item.rubric}</td>
+                                      <td className="px-4 py-3 text-slate-900 font-black text-right">{item.amount.toFixed(2)} €</td>
+                                      <td className="px-4 py-3 text-center">
+                                        {item.invoiceUrl ? (
+                                          <a href={item.invoiceUrl} target="_blank" rel="noopener noreferrer" title={item.invoiceFileName?.replace(/^\d+_/, '') || 'Fatura'} className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 transition-colors">
+                                            <Download className="w-4 h-4" />
+                                          </a>
+                                        ) : (
+                                          <span className="text-slate-300">—</span>
+                                        )}
+                                      </td>
+                                      {isAdmin && (
+                                        <td className="px-4 py-3">
+                                          <div className="flex items-center justify-center gap-1">
+                                            <button onClick={() => setEditingExpense(item)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
+                                            <button onClick={() => handleDelete(item.firestoreId)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                          </div>
+                                        </td>
+                                      )}
+                                    </tr>
+                                  ))}
+                                  <tr className="bg-blue-50/30">
+                                    <td colSpan="3" className="px-4 py-3 text-blue-900 font-bold text-right">Total do Mês</td>
+                                    <td className="px-4 py-3 text-blue-700 font-black text-right">{group.total.toFixed(2)} €</td>
+                                    <td></td>
+                                    {isAdmin && <td></td>}
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
