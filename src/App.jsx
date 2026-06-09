@@ -35,6 +35,7 @@ function App() {
   const [selectedCondoId, setSelectedCondoId] = useState(null);
   const [allCondos, setAllCondos] = useState([]);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [impersonatingUser, setImpersonatingUser] = useState(null);
 
   const handleCondoSelect = (id) => {
     if (id === 'new') {
@@ -187,13 +188,17 @@ function App() {
     }
 
     switch (activeTab) {
-      case 'dashboard': return isAdmin ? <AdminDashboard expenses={expenses} quotas={quotas} users={users} budgets={budgets} assembleias={assembleias} t={t} /> : <UserDashboard user={currentUser} quotas={quotas} expenses={expenses} budgets={budgets} users={users} assembleias={assembleias} t={t} />;
+      case 'dashboard':
+        if (impersonatingUser) {
+          return <UserDashboard user={impersonatingUser} quotas={quotas} expenses={expenses} budgets={budgets} users={users} assembleias={assembleias} t={t} />;
+        }
+        return isAdmin ? <AdminDashboard expenses={expenses} quotas={quotas} users={users} budgets={budgets} assembleias={assembleias} t={t} /> : <UserDashboard user={currentUser} quotas={quotas} expenses={expenses} budgets={budgets} users={users} assembleias={assembleias} t={t} />;
       case 'condo': return <CondoPage condo={condo} isAdmin={isAdmin} db={db} appId={appId} users={users} t={t} selectedCondoId={effectiveCondoId} />;
       case 'documentos': return <DocumentsPage documents={documents} docTypes={docTypes} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} storage={storage} selectedCondoId={effectiveCondoId} />;
       case 'despesas': return <ExpensesPage expenses={expenses} budgets={budgets} expenseTypes={expenseTypes} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} storage={storage} selectedCondoId={effectiveCondoId} />;
       case 'orcamentos': return <BudgetsPage budgets={budgets} users={users} isAdmin={isAdmin} db={db} appId={appId} selectedCondoId={effectiveCondoId} />;
       case 'conta-corrente': return isAdmin ? <CurrentAccountPage budgets={budgets} users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} condo={condo} t={t} selectedCondoId={effectiveCondoId} /> : null;
-      case 'fracoes': return <FractionsPage users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} budgets={budgets} currentUser={currentUser} t={t} selectedCondoId={effectiveCondoId} />;
+      case 'fracoes': return <FractionsPage users={users} quotas={quotas} isAdmin={isAdmin} db={db} appId={appId} budgets={budgets} currentUser={currentUser} t={t} selectedCondoId={effectiveCondoId} onImpersonate={(user) => { setImpersonatingUser(user); setActiveTab('dashboard'); }} />;
       case 'definicoes': return <SettingsPage currentUser={currentUser} db={db} appId={appId} t={t} selectedCondoId={selectedCondoId} />;
       case 'mails': return (isAdmin || isBackoffice) ? <MailsPage db={db} t={t} selectedCondoId={effectiveCondoId} isBackoffice={isBackoffice} /> : null;
       case 'assembleias': return isAdmin ? <AssembleiasPage db={db} t={t} selectedCondoId={effectiveCondoId} users={users} condo={condo} currentUser={currentUser} /> : null;
@@ -222,16 +227,16 @@ function App() {
           {isBackoffice && <NavItem icon={<ShieldAlert />} label={t('condos')} active={activeTab === 'condos'} onClick={() => { setActiveTab('condos'); setIsMobileMenuOpen(false); }} />}
           {(selectedCondoId || !isBackoffice) && (
             <>
-              <NavItem icon={<PieChart />} label={t('summary')} active={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setIsMobileMenuOpen(false); }} />
-              <NavItem icon={<Home />} label={t('condo')} active={activeTab === 'condo'} onClick={() => { setActiveTab('condo'); setIsMobileMenuOpen(false); }} />
-              <NavItem icon={<FolderOpen />} label={t('documents')} active={activeTab === 'documentos'} onClick={() => { setActiveTab('documentos'); setIsMobileMenuOpen(false); }} />
-              <NavItem icon={<Receipt />} label={t('expenses')} active={activeTab === 'despesas'} onClick={() => { setActiveTab('despesas'); setIsMobileMenuOpen(false); }} />
-              <NavItem icon={<Wallet />} label={t('budgets')} active={activeTab === 'orcamentos'} onClick={() => { setActiveTab('orcamentos'); setIsMobileMenuOpen(false); }} />
-              {isAdmin && <NavItem icon={<TrendingUp />} label={t('currentAccount')} active={activeTab === 'conta-corrente'} onClick={() => { setActiveTab('conta-corrente'); setIsMobileMenuOpen(false); }} />}
-              <NavItem icon={<Users />} label={t('fractions')} active={activeTab === 'fracoes'} onClick={() => { setActiveTab('fracoes'); setIsMobileMenuOpen(false); }} />
-              {isAdmin && <NavItem icon={<Mail />} label={t('mails')} active={activeTab === 'mails'} onClick={() => { setActiveTab('mails'); setIsMobileMenuOpen(false); }} />}
-              {isAdmin && <NavItem icon={<Calendar />} label={t('assembleias')} active={activeTab === 'assembleias'} onClick={() => { setActiveTab('assembleias'); setIsMobileMenuOpen(false); }} />}
-              {isAdmin && <NavItem icon={<CalendarDays />} label={t('calendar')} active={activeTab === 'calendario'} onClick={() => { setActiveTab('calendario'); setIsMobileMenuOpen(false); }} />}
+              <NavItem icon={<PieChart />} label={t('summary')} active={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} />
+              <NavItem icon={<Home />} label={t('condo')} active={activeTab === 'condo'} onClick={() => { setActiveTab('condo'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} />
+              <NavItem icon={<FolderOpen />} label={t('documents')} active={activeTab === 'documentos'} onClick={() => { setActiveTab('documentos'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} />
+              <NavItem icon={<Receipt />} label={t('expenses')} active={activeTab === 'despesas'} onClick={() => { setActiveTab('despesas'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} />
+              <NavItem icon={<Wallet />} label={t('budgets')} active={activeTab === 'orcamentos'} onClick={() => { setActiveTab('orcamentos'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} />
+              {isAdmin && <NavItem icon={<TrendingUp />} label={t('currentAccount')} active={activeTab === 'conta-corrente'} onClick={() => { setActiveTab('conta-corrente'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} />}
+              <NavItem icon={<Users />} label={t('fractions')} active={activeTab === 'fracoes'} onClick={() => { setActiveTab('fracoes'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} />
+              {isAdmin && <NavItem icon={<Mail />} label={t('mails')} active={activeTab === 'mails'} onClick={() => { setActiveTab('mails'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} />}
+              {isAdmin && <NavItem icon={<Calendar />} label={t('assembleias')} active={activeTab === 'assembleias'} onClick={() => { setActiveTab('assembleias'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} />}
+              {isAdmin && <NavItem icon={<CalendarDays />} label={t('calendar')} active={activeTab === 'calendario'} onClick={() => { setActiveTab('calendario'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} />}
             </>
           )}
         </nav>
@@ -276,6 +281,17 @@ function App() {
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8 safe-pb bg-slate-50/50">
           <div className="max-w-5xl mx-auto pb-6">
+            {impersonatingUser && (
+              <div className="mb-4 flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-2xl">
+                <div className="flex items-center gap-2">
+                  <Users className="w-5 h-5 text-amber-600" />
+                  <span className="text-sm font-semibold">A visualizar como: <strong>{impersonatingUser.fraction} — {impersonatingUser.name}</strong></span>
+                </div>
+                <button onClick={() => setImpersonatingUser(null)} className="px-3 py-1.5 bg-amber-600 text-white text-xs font-bold rounded-xl hover:bg-amber-700 transition-colors">
+                  Sair
+                </button>
+              </div>
+            )}
             {renderContent()}
           </div>
         </div>
