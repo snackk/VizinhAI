@@ -3,9 +3,9 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut as firebaseSignOut } from 'firebase/auth';
 import { setDoc, updateDoc, deleteDoc, doc, collection } from 'firebase/firestore';
 import { firebaseConfig, auth } from '../config/firebase.js';
-import { Plus, X, Edit2, Trash2 } from 'lucide-react';
+import { Plus, X, Edit2, Trash2, Eye } from 'lucide-react';
 
-function FractionsPage({ users, quotas, isAdmin, db, appId, budgets, currentUser, t, selectedCondoId }) {
+function FractionsPage({ users, quotas, isAdmin, db, appId, budgets, currentUser, t, selectedCondoId, onImpersonate }) {
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [newName, setNewName] = useState('');
@@ -213,6 +213,9 @@ function FractionsPage({ users, quotas, isAdmin, db, appId, budgets, currentUser
                 )}
                 {isAdmin && (
                   <div className="flex gap-1">
+                    <button onClick={() => onImpersonate && onImpersonate(frac)} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all" title="Ver como este condómino">
+                      <Eye className="w-4 h-4" />
+                    </button>
                     <button onClick={() => setEditingUser(frac)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Editar">
                       <Edit2 className="w-4 h-4" />
                     </button>

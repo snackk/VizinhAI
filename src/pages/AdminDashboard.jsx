@@ -31,9 +31,9 @@ function AdminDashboard({ expenses, quotas, users, budgets, assembleias, t }) {
 
   users.forEach(user => {
     const perm = parseFloat(user.permilagem) || 0;
-    const quotaBase = (monthlyTotal * (perm / 1000));
-    const reserveFund = quotaBase * (rfPerc / 100);
-    const totalMonthly = quotaBase + reserveFund;
+    const quotaBase = Math.round((monthlyTotal * (perm / 1000)) * 100) / 100;
+    const reserveFund = Math.round((quotaBase * (rfPerc / 100)) * 100) / 100;
+    const totalMonthly = Math.round((quotaBase + reserveFund) * 100) / 100;
 
     let carry = 0;
     // Check credit from overpaid extra quotas for this user

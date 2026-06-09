@@ -23,9 +23,9 @@ function UserDashboard({ user, quotas, expenses, budgets, users, assembleias, t 
   const rfPerc = currentBudget?.reserveFundPercentage ?? 10;
   const monthlyTotal = currentBudget ? currentBudget.totalAmount / 12 : 0;
   const perm = parseFloat(user.permilagem) || 0;
-  const quotaBase = (monthlyTotal * (perm / 1000));
-  const reserveFund = quotaBase * (rfPerc / 100);
-  const totalMonthly = quotaBase + reserveFund;
+  const quotaBase = Math.round((monthlyTotal * (perm / 1000)) * 100) / 100;
+  const reserveFund = Math.round((quotaBase * (rfPerc / 100)) * 100) / 100;
+  const totalMonthly = Math.round((quotaBase + reserveFund) * 100) / 100;
 
   const now = new Date();
   const debtMonths = months.filter(m => {
@@ -67,11 +67,9 @@ function UserDashboard({ user, quotas, expenses, budgets, users, assembleias, t 
       if (partialPaymentCarry > 0.01) {
         // Debt absorbed by this unpaid month (already counted in debtMonths), reset
         partialPaymentCarry = 0;
-      } else if (partialPaymentCarry < -0.01) {
-        // Credit absorbs this month's cost
-        partialPaymentCarry = Math.round((partialPaymentCarry + totalMonthly) * 100) / 100;
-        if (partialPaymentCarry > 0) partialPaymentCarry = 0;
       }
+      // Credit (negative carry) is NOT absorbed by unpaid months here —
+      // it remains as credit to reduce the total pendingAmount at the end.
     } else {
       partialPaymentCarry = 0;
     }
