@@ -190,9 +190,9 @@ function App() {
     switch (activeTab) {
       case 'dashboard':
         if (impersonatingUser) {
-          return <UserDashboard user={impersonatingUser} quotas={quotas} expenses={expenses} budgets={budgets} users={users} assembleias={assembleias} t={t} />;
+          return <UserDashboard user={impersonatingUser} quotas={quotas} expenses={expenses} budgets={budgets} users={users} assembleias={assembleias} condo={condo} t={t} />;
         }
-        return isAdmin ? <AdminDashboard expenses={expenses} quotas={quotas} users={users} budgets={budgets} assembleias={assembleias} t={t} /> : <UserDashboard user={currentUser} quotas={quotas} expenses={expenses} budgets={budgets} users={users} assembleias={assembleias} t={t} />;
+        return isAdmin ? <AdminDashboard expenses={expenses} quotas={quotas} users={users} budgets={budgets} assembleias={assembleias} condo={condo} t={t} /> : <UserDashboard user={currentUser} quotas={quotas} expenses={expenses} budgets={budgets} users={users} assembleias={assembleias} condo={condo} t={t} />;
       case 'condo': return <CondoPage condo={condo} isAdmin={isAdmin} db={db} appId={appId} users={users} t={t} selectedCondoId={effectiveCondoId} />;
       case 'documentos': return <DocumentsPage documents={documents} docTypes={docTypes} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} storage={storage} selectedCondoId={effectiveCondoId} />;
       case 'despesas': return <ExpensesPage expenses={expenses} budgets={budgets} expenseTypes={expenseTypes} isAdmin={isAdmin} currentUser={currentUser} db={db} appId={appId} storage={storage} selectedCondoId={effectiveCondoId} />;
@@ -204,7 +204,7 @@ function App() {
       case 'assembleias': return isAdmin ? <AssembleiasPage db={db} t={t} selectedCondoId={effectiveCondoId} users={users} condo={condo} currentUser={currentUser} /> : null;
       case 'calendario': return isAdmin ? <CalendarPage db={db} t={t} selectedCondoId={effectiveCondoId} /> : null;
       case 'condos': return isBackoffice ? <CondosPage allCondos={allCondos} db={db} t={t} onFirstCreate={() => setSelectedCondoId(null)} /> : null;
-      default: return isAdmin ? <AdminDashboard expenses={expenses} quotas={quotas} users={users} budgets={budgets} assembleias={assembleias} t={t} /> : null;
+      default: return isAdmin ? <AdminDashboard expenses={expenses} quotas={quotas} users={users} budgets={budgets} assembleias={assembleias} condo={condo} t={t} /> : null;
     }
   };
 
