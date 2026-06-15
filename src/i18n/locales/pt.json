@@ -97,6 +97,8 @@
   "calendarEventNotes": "Notas (opcional)",
   "calendarCreateEvent": "Criar Evento",
   "calendarDeleteConfirm": "Tem a certeza que deseja eliminar este evento?",
-  "calendarNoEvents": "Nenhum evento agendado."
+  "calendarNoEvents": "Nenhum evento agendado.",
+  "accountBalance": "Saldo Contabilístico",
+  "bankBalance": "Saldo na conta bancária"
 }
 

@@ -82,6 +82,8 @@
   "calendarEventNotes": "Notes (optionnel)",
   "calendarCreateEvent": "Créer Événement",
   "calendarDeleteConfirm": "Êtes-vous sûr de vouloir supprimer cet événement ?",
-  "calendarNoEvents": "Aucun événement prévu."
+  "calendarNoEvents": "Aucun événement prévu.",
+  "accountBalance": "Solde Comptable",
+  "bankBalance": "Solde du compte bancaire"
 }
 

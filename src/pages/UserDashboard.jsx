@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { AlertCircle, CheckCircle, ChevronUp, Calendar } from 'lucide-react';
+import { AlertCircle, CheckCircle, ChevronUp, Calendar, Landmark } from 'lucide-react';
 import AnnualQuotasTable from '../components/AnnualQuotasTable.jsx';
 
-function UserDashboard({ user, quotas, expenses, budgets, users, assembleias, t }) {
+function UserDashboard({ user, quotas, expenses, budgets, users, assembleias, condo, t }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const sortedBudgets = [...budgets].sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
   const currentBudget = sortedBudgets[0];
@@ -126,6 +126,19 @@ function UserDashboard({ user, quotas, expenses, budgets, users, assembleias, t 
               ))}
             </div>
           )}
+        </div>
+
+        <div className="p-6 rounded-3xl border bg-blue-50 border-blue-100 shadow-sm">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-600/70 mb-1">{t('accountBalance')}</p>
+              <h3 className="text-3xl font-bold text-slate-900 tracking-tight">{(condo?.saldoContabilistico || 0).toFixed(2)} €</h3>
+              <p className="text-[13px] text-slate-500 mt-2 font-medium">{t('bankBalance')}</p>
+            </div>
+            <div className="p-3 bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-white">
+              <Landmark className="w-6 h-6 text-blue-600" />
+            </div>
+          </div>
         </div>
       </div>
 

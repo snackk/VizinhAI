@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { jsPDF } from 'jspdf';
-import { setDoc, doc, collection, addDoc, runTransaction, getDocs, deleteDoc, updateDoc } from 'firebase/firestore';
+import { setDoc, doc, collection, addDoc, runTransaction, getDocs, deleteDoc, updateDoc, increment } from 'firebase/firestore';
 import { Wallet, CheckCircle, PlusCircle, X, Trash2, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -277,6 +277,11 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
           updatedAt: new Date().toISOString()
         });
       }
+
+      // Update saldo contabilístico (add the paid amount)
+      await updateDoc(doc(db, 'condos', selectedCondoId), {
+        saldoContabilistico: increment(paid)
+      });
 
       // Generate PDF and send email
       try {

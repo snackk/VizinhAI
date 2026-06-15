@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, increment } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { Plus, X, Receipt, Edit2, Trash2, Calendar, ChevronDown, ChevronUp, FileSpreadsheet, Settings, Paperclip, Download } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
@@ -87,6 +87,12 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
         await deleteObject(fileRef).catch(() => {});
       }
       await deleteDoc(doc(db, 'condos', selectedCondoId, 'expenses', id));
+      // Restore the amount to saldo contabilístico
+      if (expense?.amount) {
+        await updateDoc(doc(db, 'condos', selectedCondoId), {
+          saldoContabilistico: increment(expense.amount)
+        });
+      }
     } catch (err) {
       alert('Erro ao eliminar: ' + err.message);
     }

@@ -1,9 +1,9 @@
 import React from 'react';
-import { TrendingUp, AlertCircle, Calendar } from 'lucide-react';
+import { TrendingUp, AlertCircle, Calendar, Landmark } from 'lucide-react';
 import StatCard from '../components/StatCard.jsx';
 import AnnualQuotasTable from '../components/AnnualQuotasTable.jsx';
 
-function AdminDashboard({ expenses, quotas, users, budgets, assembleias, t }) {
+function AdminDashboard({ expenses, quotas, users, budgets, assembleias, condo, t }) {
   const sortedBudgets = [...budgets].sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
   const currentBudget = sortedBudgets[0];
   const rfPerc = currentBudget?.reserveFundPercentage ?? 10;
@@ -95,6 +95,7 @@ function AdminDashboard({ expenses, quotas, users, budgets, assembleias, t }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard title={t('collectedFund')} value={`${collectedAmount.toFixed(2)} €`} subtitle={t('budgetedOf', { amount: totalExpected.toFixed(2) })} icon={<TrendingUp className="w-6 h-6 text-green-600" />} color="green" />
         <StatCard title={t('overdueQuotas')} value={`${totalDebt.toFixed(2)} €`} subtitle={t('toReceive')} icon={<AlertCircle className="w-6 h-6 text-orange-600" />} color="orange" />
+        <StatCard title={t('accountBalance')} value={`${(condo?.saldoContabilistico || 0).toFixed(2)} €`} subtitle={t('bankBalance')} icon={<Landmark className="w-6 h-6 text-blue-600" />} color="blue" />
       </div>
 
       {(() => {

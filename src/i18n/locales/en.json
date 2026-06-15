@@ -97,6 +97,8 @@
   "calendarEventNotes": "Notes (optional)",
   "calendarCreateEvent": "Create Event",
   "calendarDeleteConfirm": "Are you sure you want to delete this event?",
-  "calendarNoEvents": "No events scheduled."
+  "calendarNoEvents": "No events scheduled.",
+  "accountBalance": "Account Balance",
+  "bankBalance": "Bank account balance"
 }
 
