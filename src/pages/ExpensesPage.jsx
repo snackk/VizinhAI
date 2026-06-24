@@ -65,8 +65,19 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
 
       if (editingExpense) {
         await updateDoc(doc(db, 'condos', selectedCondoId, 'expenses', editingExpense.firestoreId), expenseData);
+        // Update saldo contabilístico with the difference
+        const diff = parseFloat(value) - (editingExpense.amount || 0);
+        if (diff !== 0) {
+          await updateDoc(doc(db, 'condos', selectedCondoId), {
+            saldoContabilistico: increment(-diff)
+          });
+        }
       } else {
         await addDoc(collection(db, 'condos', selectedCondoId, 'expenses'), expenseData);
+        // Decrement saldo contabilístico when a new expense is added
+        await updateDoc(doc(db, 'condos', selectedCondoId), {
+          saldoContabilistico: increment(-parseFloat(value))
+        });
       }
       setShowForm(false);
       setEditingExpense(null);
