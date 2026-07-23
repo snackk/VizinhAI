@@ -2,16 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { collection, onSnapshot, doc } from 'firebase/firestore';
-import { auth, db, storage, appId } from './config/firebase.js';
+import { auth, db, storage, appId, useEmulators } from './config/firebase.js';
 import {
   Home, Receipt, PieChart, Users, LogOut, Menu, X,
   AlertCircle, ShieldAlert, FolderOpen, Wallet,
-  TrendingUp, Settings, Calendar, CalendarDays, Mail
+  TrendingUp, Calendar, CalendarDays, Mail, Info, ChevronLeft, ChevronRight
 } from 'lucide-react';
 
 import NavItem from './components/NavItem.jsx';
 import LoginScreen from './components/LoginScreen.jsx';
 import CondoSelectionScreen from './components/CondoSelectionScreen.jsx';
+import SplashScreen from './components/SplashScreen.jsx';
 
 import AdminDashboard from './pages/AdminDashboard.jsx';
 import UserDashboard from './pages/UserDashboard.jsx';
@@ -26,6 +27,9 @@ import MailsPage from './pages/MailsPage.jsx';
 import AssembleiasPage from './pages/AssembleiasPage.jsx';
 import CalendarPage from './pages/CalendarPage.jsx';
 import CondosPage from './pages/CondosPage.jsx';
+import AboutPage from './pages/AboutPage.jsx';
+
+const SIDEBAR_COLLAPSED_KEY = 'vizinhai:sidebarCollapsed';
 
 function App() {
   const { t, i18n } = useTranslation();
@@ -36,6 +40,17 @@ function App() {
   const [allCondos, setAllCondos] = useState([]);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [impersonatingUser, setImpersonatingUser] = useState(null);
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true'; } catch { return false; }
+  });
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next)); } catch { /* ignore */ }
+      return next;
+    });
+  };
 
   const handleCondoSelect = (id) => {
     if (id === 'new') {
@@ -161,7 +176,7 @@ function App() {
     </div>;
   }
 
-  if (!isFirebaseReady) return <div className="h-screen w-full flex items-center justify-center bg-slate-50">A carregar o sistema...</div>;
+  if (!isFirebaseReady) return <SplashScreen />;
   if (!firebaseUser || !currentUser) return <LoginScreen t={t} />;
 
   const isAdmin = currentUser.role === 'admin' || currentUser.role === 'backoffice';
@@ -204,6 +219,7 @@ function App() {
       case 'assembleias': return isAdmin ? <AssembleiasPage db={db} t={t} selectedCondoId={effectiveCondoId} users={users} condo={condo} currentUser={currentUser} /> : null;
       case 'calendario': return isAdmin ? <CalendarPage db={db} t={t} selectedCondoId={effectiveCondoId} /> : null;
       case 'condos': return isBackoffice ? <CondosPage allCondos={allCondos} db={db} t={t} onFirstCreate={() => setSelectedCondoId(null)} /> : null;
+      case 'sobre': return <AboutPage />;
       default: return isAdmin ? <AdminDashboard expenses={expenses} quotas={quotas} users={users} budgets={budgets} assembleias={assembleias} condo={condo} t={t} /> : null;
     }
   };
@@ -212,53 +228,89 @@ function App() {
 
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-800 safe-pl safe-pr">
+      {useEmulators && (
+        <div className="fixed bottom-3 right-3 z-[60] text-[11px] font-bold uppercase tracking-wide bg-amber-100 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-full shadow-sm">
+          Modo Emulador Local
+        </div>
+      )}
       {isMobileMenuOpen && <div className="fixed inset-0 bg-slate-800/60 z-40 lg:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsMobileMenuOpen(false)} />}
 
-      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:flex lg:flex-col lg:shadow-none lg:border-r lg:border-slate-200 safe-pt safe-pb flex flex-col ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="flex items-center justify-between h-16 px-6 border-b border-slate-100 shrink-0">
-          <div className="flex items-center gap-2">
-            <div className="bg-blue-600 p-1.5 rounded-lg"><Home className="w-5 h-5 text-white" /></div>
-            <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-blue-500">VizinhAI</span>
+      <aside className={`fixed inset-y-0 left-0 z-50 ${collapsed ? 'w-20' : 'w-72'} bg-white shadow-2xl transform transition-all duration-300 ease-in-out lg:translate-x-0 lg:static lg:flex lg:flex-col lg:shadow-none lg:border-r lg:border-slate-200 safe-pt safe-pb flex flex-col ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className={`flex items-center h-16 border-b border-slate-100 shrink-0 ${collapsed ? 'justify-center gap-2 px-2' : 'justify-between px-6'}`}>
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="bg-blue-600 p-1.5 rounded-lg shrink-0"><Home className="w-5 h-5 text-white" /></div>
+            {!collapsed && <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-blue-500 truncate">VizinhAI</span>}
           </div>
-          <button className="lg:hidden text-slate-400 p-2 hover:bg-slate-100 rounded-full" onClick={() => setIsMobileMenuOpen(false)}><X className="w-6 h-6" /></button>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => { setActiveTab('sobre'); setIsMobileMenuOpen(false); }}
+              title="Sobre"
+              className="text-slate-400 p-2 hover:bg-slate-100 rounded-full transition-colors"
+            >
+              <Info className="w-5 h-5" />
+            </button>
+            {!collapsed && (
+              <button className="lg:hidden text-slate-400 p-2 hover:bg-slate-100 rounded-full" onClick={() => setIsMobileMenuOpen(false)}><X className="w-6 h-6" /></button>
+            )}
+          </div>
         </div>
 
-        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-          {isBackoffice && <NavItem icon={<ShieldAlert />} label={t('condos')} active={activeTab === 'condos'} onClick={() => { setActiveTab('condos'); setIsMobileMenuOpen(false); }} />}
+        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto overflow-x-hidden">
+          {isBackoffice && <NavItem icon={<ShieldAlert />} label={t('condos')} active={activeTab === 'condos'} onClick={() => { setActiveTab('condos'); setIsMobileMenuOpen(false); }} collapsed={collapsed} />}
           {(selectedCondoId || !isBackoffice) && (
             <>
-              <NavItem icon={<PieChart />} label={t('summary')} active={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} />
-              <NavItem icon={<Home />} label={t('condo')} active={activeTab === 'condo'} onClick={() => { setActiveTab('condo'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} />
-              <NavItem icon={<FolderOpen />} label={t('documents')} active={activeTab === 'documentos'} onClick={() => { setActiveTab('documentos'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} />
-              <NavItem icon={<Receipt />} label={t('expenses')} active={activeTab === 'despesas'} onClick={() => { setActiveTab('despesas'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} />
-              <NavItem icon={<Wallet />} label={t('budgets')} active={activeTab === 'orcamentos'} onClick={() => { setActiveTab('orcamentos'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} />
-              {isAdmin && <NavItem icon={<TrendingUp />} label={t('currentAccount')} active={activeTab === 'conta-corrente'} onClick={() => { setActiveTab('conta-corrente'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} />}
-              <NavItem icon={<Users />} label={t('fractions')} active={activeTab === 'fracoes'} onClick={() => { setActiveTab('fracoes'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} />
-              {isAdmin && <NavItem icon={<Mail />} label={t('mails')} active={activeTab === 'mails'} onClick={() => { setActiveTab('mails'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} />}
-              {isAdmin && <NavItem icon={<Calendar />} label={t('assembleias')} active={activeTab === 'assembleias'} onClick={() => { setActiveTab('assembleias'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} />}
-              {isAdmin && <NavItem icon={<CalendarDays />} label={t('calendar')} active={activeTab === 'calendario'} onClick={() => { setActiveTab('calendario'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} />}
+              <NavItem icon={<PieChart />} label={t('summary')} active={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} collapsed={collapsed} />
+              <NavItem icon={<Home />} label={t('condo')} active={activeTab === 'condo'} onClick={() => { setActiveTab('condo'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} collapsed={collapsed} />
+              <NavItem icon={<FolderOpen />} label={t('documents')} active={activeTab === 'documentos'} onClick={() => { setActiveTab('documentos'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} collapsed={collapsed} />
+              <NavItem icon={<Receipt />} label={t('expenses')} active={activeTab === 'despesas'} onClick={() => { setActiveTab('despesas'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} collapsed={collapsed} />
+              <NavItem icon={<Wallet />} label={t('budgets')} active={activeTab === 'orcamentos'} onClick={() => { setActiveTab('orcamentos'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} collapsed={collapsed} />
+              {isAdmin && <NavItem icon={<TrendingUp />} label={t('currentAccount')} active={activeTab === 'conta-corrente'} onClick={() => { setActiveTab('conta-corrente'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} collapsed={collapsed} />}
+              <NavItem icon={<Users />} label={t('fractions')} active={activeTab === 'fracoes'} onClick={() => { setActiveTab('fracoes'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} collapsed={collapsed} />
+              {isAdmin && <NavItem icon={<Mail />} label={t('mails')} active={activeTab === 'mails'} onClick={() => { setActiveTab('mails'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} collapsed={collapsed} />}
+              {isAdmin && <NavItem icon={<Calendar />} label={t('assembleias')} active={activeTab === 'assembleias'} onClick={() => { setActiveTab('assembleias'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} collapsed={collapsed} />}
+              {isAdmin && <NavItem icon={<CalendarDays />} label={t('calendar')} active={activeTab === 'calendario'} onClick={() => { setActiveTab('calendario'); setImpersonatingUser(null); setIsMobileMenuOpen(false); }} collapsed={collapsed} />}
             </>
           )}
         </nav>
 
-        <div className="p-4 border-t border-slate-100 shrink-0">
+        <div className={`border-t border-slate-100 shrink-0 ${collapsed ? 'p-2' : 'p-4'}`}>
           {(isBackoffice || currentUser.condoIds?.length > 1) && (
-            <button onClick={() => setSelectedCondoId(null)} className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium text-blue-600 rounded-xl hover:bg-blue-50 transition-colors mb-2">
-              <Calendar className="w-5 h-5" /> {t('switchCondo')}
+            <button
+              onClick={() => setSelectedCondoId(null)}
+              title={collapsed ? t('switchCondo') : undefined}
+              className={`flex items-center gap-3 w-full py-3 text-sm font-medium text-blue-600 rounded-xl hover:bg-blue-50 transition-colors mb-2 ${collapsed ? 'justify-center px-0' : 'px-4'}`}
+            >
+              <Calendar className="w-5 h-5 shrink-0" /> {!collapsed && t('switchCondo')}
             </button>
           )}
-          <NavItem icon={<Settings />} label={t('settings')} active={activeTab === 'definicoes'} onClick={() => { setActiveTab('definicoes'); setIsMobileMenuOpen(false); }} />
-          <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-xl mt-2 mb-4">
-            <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg">
+          <button
+            onClick={() => { setActiveTab('definicoes'); setIsMobileMenuOpen(false); }}
+            title={collapsed ? currentUser?.name : undefined}
+            className={`flex items-center gap-3 w-full rounded-xl hover:bg-slate-100 transition-colors mb-2 text-left ${collapsed ? 'justify-center p-2' : 'px-4 py-3 bg-slate-50'}`}
+          >
+            <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg shrink-0">
               {currentUser?.name?.charAt(0) || 'U'}
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-slate-900 truncate">{currentUser?.name}</p>
-              <p className="text-xs text-slate-500 truncate">{currentUser?.fraction || (isBackoffice ? 'Admin' : '')} {currentUser?.permilagem ? `(${currentUser.permilagem}‰)` : ''} • {userRoleLabel}</p>
-            </div>
-          </div>
-          <button onClick={handleLogout} className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium text-red-600 rounded-xl hover:bg-red-50 transition-colors">
-            <LogOut className="w-5 h-5" /> {t('logout')}
+            {!collapsed && (
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-slate-900 truncate">{currentUser?.name}</p>
+                <p className="text-xs text-slate-500 truncate">{currentUser?.fraction || (isBackoffice ? 'Admin' : '')} {currentUser?.permilagem ? `(${currentUser.permilagem}‰)` : ''} • {userRoleLabel}</p>
+              </div>
+            )}
+          </button>
+          <button
+            onClick={handleLogout}
+            title={collapsed ? t('logout') : undefined}
+            className={`flex items-center gap-3 w-full py-3 text-sm font-medium text-red-600 rounded-xl hover:bg-red-50 transition-colors ${collapsed ? 'justify-center px-0' : 'px-4'}`}
+          >
+            <LogOut className="w-5 h-5 shrink-0" /> {!collapsed && t('logout')}
+          </button>
+
+          <button
+            onClick={toggleCollapsed}
+            className={`hidden lg:flex items-center gap-2 w-full py-2.5 mt-2 text-xs font-semibold text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors ${collapsed ? 'justify-center px-0' : 'px-4'}`}
+          >
+            {collapsed ? <ChevronRight className="w-4 h-4" /> : <><ChevronLeft className="w-4 h-4" /> Colapsar</>}
           </button>
         </div>
       </aside>
