@@ -90,6 +90,24 @@ Then run:
 npm run dev
 ```
 
+### Testar localmente com o Mock Firebase
+
+Para validar alterações sem tocar nos dados reais de produção, é possível correr a aplicação
+contra o Firebase Local Emulator Suite (Auth + Firestore + Storage):
+
+```bash
+# Terminal 1 — arranca os emuladores locais (UI em http://localhost:4001)
+npm run emulators
+
+# Terminal 2 — arranca a app já ligada aos emuladores
+VITE_USE_FIREBASE_EMULATORS=true npm run dev
+```
+
+- O login com Google é simulado pelo próprio emulador de Auth: ao entrar, abre-se uma janela onde se escolhe/cria uma conta de teste (sem contactar a Google).
+- Os dados ficam apenas em memória do emulador — reiniciar os emuladores limpa tudo.
+- As regras usadas pelos emuladores (`firestore.rules` / `storage.rules`) são permissivas de propósito (qualquer utilizador autenticado), pensadas só para testes locais — não são as regras do projeto real em produção.
+- Este passo é opcional: sem `VITE_USE_FIREBASE_EMULATORS=true`, `npm run dev` continua a ligar-se ao Firebase configurado em `VITE_FIREBASE_CONFIG` normalmente.
+
 ### Production Build
 
 ```bash

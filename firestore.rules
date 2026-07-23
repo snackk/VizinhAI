@@ -1,0 +1,26 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() { return request.auth != null; }
+
+    // Intentionally permissive (any signed-in user) — these rules are only used against
+    // the local Firebase Emulator Suite for development/testing, not deployed to production.
+    match /users/{uid} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    match /condos/{condoId} {
+      allow read, write: if isSignedIn();
+
+      match /{collection}/{docId} {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    // Legacy per-condo user doc path (see AuthContext-equivalent bootstrap in App.jsx).
+    match /artifacts/{appId}/public/data/{collection}/{docId} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}
