@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* Opaque canvas behind the status bar / safe areas so iOS (Liquid Glass, incl. "Tinted") never falls back
+   to white there. On mobile the top of the page is the blue-600 header (same as theme-color); on desktop it is
+   the slate-50 page background. */
+html {
+  background-color: #2563eb;
+}
+@media (min-width: 1024px) {
+  html { background-color: #f8fafc; }
+}
+
 body {
   overscroll-behavior-y: none;
   -webkit-tap-highlight-color: transparent;
