@@ -6,6 +6,8 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import * as XLSX from 'xlsx';
 import Toast from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
+import i18n from '../i18n';
+import { formatCurrency } from '../utils/formatCurrency';
 
 function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, db, appId, storage, selectedCondoId, t }) {
   const [toast, setToast] = useState(null);
@@ -452,14 +454,14 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
           <div className="mb-4">
             <h3 className="font-bold text-lg text-slate-800">Despesas vs Orçamento</h3>
-            <p className="text-xs text-slate-500 mt-1">Evolução cumulativa dos gastos reais face ao orçamentado ({chartData.totalBudget.toFixed(2)} €)</p>
+            <p className="text-xs text-slate-500 mt-1">Evolução cumulativa dos gastos reais face ao orçamentado ({formatCurrency(chartData.totalBudget, i18n.language)})</p>
           </div>
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={chartData.data} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
               <YAxis tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} tickFormatter={(v) => `${v}€`} />
-              <Tooltip formatter={(value) => [`${Number(value).toFixed(2)} €`]} contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }} />
+              <Tooltip formatter={(value) => [formatCurrency(Number(value), i18n.language)]} contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }} />
               <Legend wrapperStyle={{ paddingTop: '12px' }} />
               <Line type="monotone" dataKey="Orçamentado" stroke="#94a3b8" strokeWidth={2} strokeDasharray="6 4" dot={false} />
               <Line type="monotone" dataKey="Gasto Real" stroke="#2563eb" strokeWidth={3} dot={{ fill: '#2563eb', r: 4 }} activeDot={{ r: 6 }} />
@@ -481,13 +483,13 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
                   </div>
                   <div>
                     <h3 className="font-bold text-slate-800 text-lg capitalize">{period.label}</h3>
-                    <p className="text-xs text-slate-500">{period.months.length} {period.months.length === 1 ? 'mês' : 'meses'} com despesas{period.totalBudget ? ` · Orçamento: ${period.totalBudget.toFixed(2)} €` : ''}</p>
+                    <p className="text-xs text-slate-500">{period.months.length} {period.months.length === 1 ? 'mês' : 'meses'} com despesas{period.totalBudget ? ` · Orçamento: ${formatCurrency(period.totalBudget, i18n.language)}` : ''}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-6">
                   <div className="text-right hidden sm:block">
                     <p className="text-xs font-semibold uppercase text-slate-400 tracking-wider">Total Período</p>
-                    <p className={`font-bold text-lg ${period.isCurrent ? 'text-blue-600' : 'text-slate-900'}`}>{period.total.toFixed(2)} €</p>
+                    <p className={`font-bold text-lg ${period.isCurrent ? 'text-blue-600' : 'text-slate-900'}`}>{formatCurrency(period.total, i18n.language)}</p>
                   </div>
                   {isPeriodExpanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
                 </div>
@@ -513,7 +515,7 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
                             </div>
                           </div>
                           <div className="flex items-center gap-4">
-                            <p className={`font-bold text-sm ${isCurrent ? 'text-blue-600' : 'text-slate-700'}`}>{group.total.toFixed(2)} €</p>
+                            <p className={`font-bold text-sm ${isCurrent ? 'text-blue-600' : 'text-slate-700'}`}>{formatCurrency(group.total, i18n.language)}</p>
                             {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
                           </div>
                         </div>
@@ -538,7 +540,7 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
                                       <td className="px-4 py-3 text-slate-500 font-medium">{new Date(item.date).toLocaleDateString('pt')}</td>
                                       <td className="px-4 py-3 text-slate-500 text-xs">{item.expenseType ? <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-lg font-semibold">{item.expenseType}</span> : <span className="text-slate-300">—</span>}</td>
                                       <td className="px-4 py-3 text-slate-700 font-bold">{item.rubric}</td>
-                                      <td className="px-4 py-3 text-slate-900 font-black text-right">{item.amount.toFixed(2)} €</td>
+                                      <td className="px-4 py-3 text-slate-900 font-black text-right">{formatCurrency(item.amount, i18n.language)}</td>
                                       <td className="px-4 py-3 text-center">
                                         {item.invoiceUrl ? (
                                           <a href={item.invoiceUrl} target="_blank" rel="noopener noreferrer" title={item.invoiceFileName?.replace(/^\d+_/, '') || 'Fatura'} className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 transition-colors">
@@ -560,7 +562,7 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
                                   ))}
                                   <tr className="bg-blue-50/30">
                                     <td colSpan="3" className="px-4 py-3 text-blue-900 font-bold text-right">Total do Mês</td>
-                                    <td className="px-4 py-3 text-blue-700 font-black text-right">{group.total.toFixed(2)} €</td>
+                                    <td className="px-4 py-3 text-blue-700 font-black text-right">{formatCurrency(group.total, i18n.language)}</td>
                                     <td></td>
                                     {isAdmin && <td></td>}
                                   </tr>

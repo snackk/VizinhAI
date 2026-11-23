@@ -1,4 +1,6 @@
 import React from 'react';
+import i18n from '../i18n';
+import { formatCurrency } from '../utils/formatCurrency';
 
 function AnnualQuotasTable({ currentBudget, users }) {
   if (!currentBudget) return null;
@@ -51,17 +53,17 @@ function AnnualQuotasTable({ currentBudget, users }) {
               <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                 <td className="px-4 py-3.5 font-bold text-slate-900">{row.fraction}</td>
                 <td className="px-4 py-3.5 text-center text-slate-600">{row.perm}‰</td>
-                <td className="px-4 py-3.5 text-right text-slate-700">{row.annualQuota.toFixed(2)} €</td>
-                <td className="px-4 py-3.5 text-right text-slate-700">{row.annualRF.toFixed(2)} €</td>
-                <td className="px-4 py-3.5 text-right font-black text-blue-600">{row.total.toFixed(2)} €</td>
+                <td className="px-4 py-3.5 text-right text-slate-700">{formatCurrency(row.annualQuota, i18n.language)}</td>
+                <td className="px-4 py-3.5 text-right text-slate-700">{formatCurrency(row.annualRF, i18n.language)}</td>
+                <td className="px-4 py-3.5 text-right font-black text-blue-600">{formatCurrency(row.total, i18n.language)}</td>
               </tr>
             ))}
             <tr className="bg-blue-50/30 font-bold">
               <td className="px-4 py-4 text-blue-900">TOTAL GERAL</td>
               <td className="px-4 py-4 text-center text-blue-900">1000‰</td>
-              <td className="px-4 py-4 text-right text-blue-900">{grandTotalQuota.toFixed(2)} €</td>
-              <td className="px-4 py-4 text-right text-blue-900">{grandTotalRF.toFixed(2)} €</td>
-              <td className="px-4 py-4 text-right text-blue-700 text-lg font-black">{grandTotal.toFixed(2)} €</td>
+              <td className="px-4 py-4 text-right text-blue-900">{formatCurrency(grandTotalQuota, i18n.language)}</td>
+              <td className="px-4 py-4 text-right text-blue-900">{formatCurrency(grandTotalRF, i18n.language)}</td>
+              <td className="px-4 py-4 text-right text-blue-700 text-lg font-black">{formatCurrency(grandTotal, i18n.language)}</td>
             </tr>
           </tbody>
         </table>

@@ -6,6 +6,8 @@ import { Wallet, CheckCircle, PlusCircle, X, Trash2, FileSpreadsheet } from 'luc
 import * as XLSX from 'xlsx';
 import Toast from '../components/Toast';
 import ConfirmDialog from '../components/ConfirmDialog';
+import i18n from '../i18n';
+import { formatCurrency } from '../utils/formatCurrency';
 
 function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo, t, selectedCondoId }) {
   const [toast, setToast] = useState(null);
@@ -212,8 +214,8 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
 
     const overpayment = paid > owedAmount + 0.01 ? Math.round((paid - owedAmount) * 100) / 100 : 0;
     const confirmMsg = overpayment > 0
-      ? `Confirma o pagamento de ${paid.toFixed(2)}€ referente a ${monthName} ${year} (${user.fraction})? O excedente de ${overpayment.toFixed(2)}€ será aplicado como crédito no(s) mês(es) seguinte(s). Esta ação é irreversível e enviará um e-mail de recibo.`
-      : `Confirma o pagamento de ${paid.toFixed(2)}€ referente a ${monthName} ${year} (${user.fraction})? Esta ação é irreversível e enviará um e-mail de recibo.`;
+      ? `Confirma o pagamento de ${formatCurrency(paid, i18n.language)} referente a ${monthName} ${year} (${user.fraction})? O excedente de ${formatCurrency(overpayment, i18n.language)} será aplicado como crédito no(s) mês(es) seguinte(s). Esta ação é irreversível e enviará um e-mail de recibo.`
+      : `Confirma o pagamento de ${formatCurrency(paid, i18n.language)} referente a ${monthName} ${year} (${user.fraction})? Esta ação é irreversível e enviará um e-mail de recibo.`;
 
     setConfirmDialog({
       message: confirmMsg,
@@ -613,7 +615,7 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
                     <p className="text-sm text-slate-500 mt-2">Referência</p>
                     <p className="font-semibold text-slate-700 capitalize">{t(`months.${monthIdx}`)} {year} {paymentModal.isExtra && <span className="text-amber-600 text-xs">(Extra)</span>}</p>
                     <p className="text-sm text-slate-500 mt-2">Valor em dívida</p>
-                    <p className="font-bold text-red-600 text-xl">{paymentModal.owedAmount.toFixed(2)} €</p>
+                    <p className="font-bold text-red-600 text-xl">{formatCurrency(paymentModal.owedAmount, i18n.language)}</p>
                   </div>
 
                   <div>
@@ -634,7 +636,7 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
                     )}
                     {parseFloat(paymentAmount) > paymentModal.owedAmount + 0.01 && (
                       <p className="text-xs text-blue-600 mt-2 font-medium">
-                        💰 Pagamento com adiantamento — o excedente de {(parseFloat(paymentAmount) - paymentModal.owedAmount).toFixed(2)}€ será aplicado como crédito no(s) mês(es) seguinte(s).
+                        💰 Pagamento com adiantamento — o excedente de {formatCurrency(parseFloat(paymentAmount) - paymentModal.owedAmount, i18n.language)} será aplicado como crédito no(s) mês(es) seguinte(s).
                       </p>
                     )}
                   </div>
@@ -644,7 +646,7 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
                     disabled={paymentLoading || !paymentAmount || parseFloat(paymentAmount) <= 0}
                     className="w-full py-3 bg-green-600 text-white rounded-2xl font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors"
                   >
-                    {paymentLoading ? 'A processar...' : `Emitir Recibo de ${parseFloat(paymentAmount || 0).toFixed(2)}€`}
+                    {paymentLoading ? 'A processar...' : `Emitir Recibo de ${formatCurrency(parseFloat(paymentAmount || 0), i18n.language)}`}
                   </button>
                 </div>
               );
@@ -783,7 +785,7 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
                           ) : (
                             <div className="flex flex-col items-center">
                               <div className="text-[10px] font-medium leading-tight">
-                                <div className="font-bold text-amber-700">Σ {amount.toFixed(2)}€</div>
+                                <div className="font-bold text-amber-700">Σ {formatCurrency(amount, i18n.language)}</div>
                               </div>
                             </div>
                           )}
@@ -811,10 +813,10 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
                               <CheckCircle className="w-4 h-4 mb-0.5" />
                               <span className="text-[10px] font-bold uppercase tracking-tight">Pago</span>
                               {quota.paidAmount !== undefined && quota.paidAmount < baseTotal + (quota.carryoverAmount || 0) - 0.01 && (
-                                <span className="text-[9px] text-amber-600 font-medium">{quota.paidAmount.toFixed(2)}€</span>
+                                <span className="text-[9px] text-amber-600 font-medium">{formatCurrency(quota.paidAmount, i18n.language)}</span>
                               )}
                               {quota.paidAmount !== undefined && quota.paidAmount > baseTotal + (quota.carryoverAmount || 0) + 0.01 && (
-                                <span className="text-[9px] text-blue-600 font-medium">{quota.paidAmount.toFixed(2)}€</span>
+                                <span className="text-[9px] text-blue-600 font-medium">{formatCurrency(quota.paidAmount, i18n.language)}</span>
                               )}
                             </div>
                           ) : totalWithCarry <= 0 ? (
@@ -826,15 +828,15 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
                           ) : (
                             <div className="flex flex-col items-center opacity-60 group-hover:opacity-100">
                               <div className="text-[10px] font-medium leading-tight">
-                                <div>Q: {quotaBase.toFixed(2)}€</div>
-                                <div>FR: {reserveFund.toFixed(2)}€</div>
+                                <div>Q: {formatCurrency(quotaBase, i18n.language)}</div>
+                                <div>FR: {formatCurrency(reserveFund, i18n.language)}</div>
                                 {carryover > 0.01 && (
-                                  <div className="text-amber-600">+{carryover.toFixed(2)}€</div>
+                                  <div className="text-amber-600">+{formatCurrency(carryover, i18n.language)}</div>
                                 )}
                                 {carryover < -0.01 && (
-                                  <div className="text-blue-600">{carryover.toFixed(2)}€</div>
+                                  <div className="text-blue-600">{formatCurrency(carryover, i18n.language)}</div>
                                 )}
-                                <div className="border-t border-slate-200 mt-1 pt-0.5 font-bold text-slate-600">Σ {totalWithCarry.toFixed(2)}€</div>
+                                <div className="border-t border-slate-200 mt-1 pt-0.5 font-bold text-slate-600">Σ {formatCurrency(totalWithCarry, i18n.language)}</div>
                               </div>
                             </div>
                           )}

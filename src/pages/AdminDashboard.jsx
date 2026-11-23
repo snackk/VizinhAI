@@ -2,6 +2,8 @@ import React from 'react';
 import { TrendingUp, AlertCircle, Calendar, Landmark } from 'lucide-react';
 import StatCard from '../components/StatCard.jsx';
 import AnnualQuotasTable from '../components/AnnualQuotasTable.jsx';
+import i18n from '../i18n';
+import { formatCurrency } from '../utils/formatCurrency';
 
 function AdminDashboard({ expenses, quotas, users, budgets, assembleias, condo, t }) {
   const sortedBudgets = [...budgets].sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
@@ -93,9 +95,9 @@ function AdminDashboard({ expenses, quotas, users, budgets, assembleias, condo, 
         <p className="text-slate-500 text-sm mt-1">{t('globalVision')}</p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatCard title={t('collectedFund')} value={`${collectedAmount.toFixed(2)} €`} subtitle={t('budgetedOf', { amount: totalExpected.toFixed(2) })} icon={<TrendingUp className="w-6 h-6 text-green-600" />} color="green" />
-        <StatCard title={t('overdueQuotas')} value={`${totalDebt.toFixed(2)} €`} subtitle={t('toReceive')} icon={<AlertCircle className="w-6 h-6 text-orange-600" />} color="orange" />
-        <StatCard title={t('accountBalance')} value={`${(condo?.saldoContabilistico || 0).toFixed(2)} €`} subtitle={t('bankBalance')} icon={<Landmark className="w-6 h-6 text-blue-600" />} color="blue" />
+        <StatCard title={t('collectedFund')} value={formatCurrency(collectedAmount, i18n.language)} subtitle={t('budgetedOf', { amount: formatCurrency(totalExpected, i18n.language) })} icon={<TrendingUp className="w-6 h-6 text-green-600" />} color="green" />
+        <StatCard title={t('overdueQuotas')} value={formatCurrency(totalDebt, i18n.language)} subtitle={t('toReceive')} icon={<AlertCircle className="w-6 h-6 text-orange-600" />} color="orange" />
+        <StatCard title={t('accountBalance')} value={formatCurrency(condo?.saldoContabilistico || 0, i18n.language)} subtitle={t('bankBalance')} icon={<Landmark className="w-6 h-6 text-blue-600" />} color="blue" />
       </div>
 
       {(() => {
