@@ -6,10 +6,14 @@
  * @returns {string} the formatted currency string, or '—' for
  *   null/undefined/NaN/non-finite input.
  */
+const REGIONAL_LOCALE_TAGS = { pt: 'pt-PT', fr: 'fr-FR', en: 'en-GB' };
+
 export function formatCurrency(value, locale) {
   if (value === null || value === undefined || !Number.isFinite(Number(value))) {
     return '—';
   }
 
-  return new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR' }).format(Number(value));
+  const regionalLocale = REGIONAL_LOCALE_TAGS[locale] ?? locale;
+
+  return new Intl.NumberFormat(regionalLocale, { style: 'currency', currency: 'EUR' }).format(Number(value));
 }
