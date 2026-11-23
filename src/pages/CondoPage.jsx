@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { updateDoc, doc } from 'firebase/firestore';
 import { Home, Settings, AlertCircle, FileText, User } from 'lucide-react';
+import Toast from '../components/Toast';
 
 function CondoPage({ condo, isAdmin, db, appId, users, t, selectedCondoId }) {
+  const [toast, setToast] = useState(null);
   const [isEditing, setIsEditing] = useState(!condo);
   const [formData, setFormData] = useState(condo || { name: '', address: '', nif: '', iban: '' });
   const [saving, setSaving] = useState(false);
@@ -25,7 +27,7 @@ function CondoPage({ condo, isAdmin, db, appId, users, t, selectedCondoId }) {
       await updateDoc(doc(db, 'condos', selectedCondoId), formData);
       setIsEditing(false);
     } catch (err) {
-      alert('Erro ao guardar: ' + err.message);
+      setToast({ message: 'Erro ao guardar: ' + err.message, type: 'error' });
     } finally {
       setSaving(false);
     }
@@ -36,6 +38,7 @@ function CondoPage({ condo, isAdmin, db, appId, users, t, selectedCondoId }) {
 
   return (
     <div className="space-y-6">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <div className="flex justify-between items-center pt-2">
         <h2 className="text-[26px] font-bold text-slate-800 tracking-tight">Condomínio</h2>
         {isAdmin && !isEditing && (
@@ -108,7 +111,7 @@ function CondoPage({ condo, isAdmin, db, appId, users, t, selectedCondoId }) {
                       <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">IBAN para Pagamentos</p>
                       <div className="bg-white p-4 rounded-2xl border border-slate-100 flex items-center justify-between">
                         <p className="text-blue-700 font-mono font-bold text-lg">{condo.iban}</p>
-                        <button onClick={() => {navigator.clipboard.writeText(condo.iban); alert('IBAN copiado!');}} className="text-blue-600 hover:bg-blue-100 p-2 rounded-lg transition-colors">
+                        <button onClick={() => {navigator.clipboard.writeText(condo.iban); setToast({ message: 'IBAN copiado!', type: 'success' });}} className="text-blue-600 hover:bg-blue-100 p-2 rounded-lg transition-colors">
                           <FileText className="w-5 h-5" />
                         </button>
                       </div>

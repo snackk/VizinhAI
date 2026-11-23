@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, addDoc, deleteDoc, updateDoc, doc, onSnapshot, Timestamp } from 'firebase/firestore';
 import { CalendarDays, Plus, Trash2, X, ChevronDown, ChevronUp, Save } from 'lucide-react';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 export default function CalendarPage({ db, selectedCondoId, t }) {
   const [events, setEvents] = useState([]);
@@ -13,6 +14,7 @@ export default function CalendarPage({ db, selectedCondoId, t }) {
   const [hour, setHour] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const expandedRef = useRef(null);
 
   useEffect(() => {
@@ -65,9 +67,15 @@ export default function CalendarPage({ db, selectedCondoId, t }) {
     setLoading(false);
   };
 
-  const handleDelete = async (eventId) => {
-    if (!confirm(t('calendarDeleteConfirm'))) return;
+  const performDelete = async (eventId) => {
     await deleteDoc(doc(db, `condos/${selectedCondoId}/events`, eventId));
+  };
+
+  const handleDelete = (eventId) => {
+    setConfirmDialog({
+      message: t('calendarDeleteConfirm'),
+      onConfirm: () => { setConfirmDialog(null); performDelete(eventId); }
+    });
   };
 
   const handleUpdate = async (eventId) => {
@@ -94,6 +102,12 @@ export default function CalendarPage({ db, selectedCondoId, t }) {
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog
+        open={!!confirmDialog}
+        message={confirmDialog?.message}
+        onConfirm={() => confirmDialog?.onConfirm()}
+        onCancel={() => setConfirmDialog(null)}
+      />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">{t('calendar')}</h1>

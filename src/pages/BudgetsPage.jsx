@@ -2,8 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { Plus, X, Wallet, Edit2, Trash2, Calendar, ChevronDown, ChevronUp, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import Toast from '../components/Toast';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 function BudgetsPage({ budgets, users, isAdmin, db, appId, selectedCondoId }) {
+  const [toast, setToast] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editingBudget, setEditingBudget] = useState(null);
   const [startDate, setStartDate] = useState('');
@@ -59,19 +63,25 @@ function BudgetsPage({ budgets, users, isAdmin, db, appId, selectedCondoId }) {
       setShowForm(false);
       setEditingBudget(null);
     } catch (err) {
-      alert('Erro ao guardar orçamento: ' + err.message);
+      setToast({ message: 'Erro ao guardar orçamento: ' + err.message, type: 'error' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('Tem a certeza que deseja eliminar este orçamento?')) return;
+  const performDelete = async (id) => {
     try {
       await deleteDoc(doc(db, 'condos', selectedCondoId, 'budgets', id));
     } catch (err) {
-      alert('Erro ao eliminar: ' + err.message);
+      setToast({ message: 'Erro ao eliminar: ' + err.message, type: 'error' });
     }
+  };
+
+  const handleDelete = (id) => {
+    setConfirmDialog({
+      message: 'Tem a certeza que deseja eliminar este orçamento?',
+      onConfirm: () => { setConfirmDialog(null); performDelete(id); }
+    });
   };
 
   const getMonths = (start, end) => {
@@ -162,6 +172,13 @@ function BudgetsPage({ budgets, users, isAdmin, db, appId, selectedCondoId }) {
 
   return (
     <div className="space-y-6">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      <ConfirmDialog
+        open={!!confirmDialog}
+        message={confirmDialog?.message}
+        onConfirm={() => confirmDialog?.onConfirm()}
+        onCancel={() => setConfirmDialog(null)}
+      />
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-2">
         <div>
           <h2 className="text-[26px] font-bold text-slate-800">Orçamentos</h2>

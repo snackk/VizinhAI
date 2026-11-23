@@ -4,8 +4,12 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage
 import { Plus, X, Receipt, Edit2, Trash2, Calendar, ChevronDown, ChevronUp, FileSpreadsheet, Settings, Paperclip, Download } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 import * as XLSX from 'xlsx';
+import Toast from '../components/Toast';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, db, appId, storage, selectedCondoId, t }) {
+  const [toast, setToast] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [showTypeForm, setShowTypeForm] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
@@ -83,14 +87,13 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
       setEditingExpense(null);
       setFile(null);
     } catch (err) {
-      alert('Erro ao guardar despesa: ' + err.message);
+      setToast({ message: 'Erro ao guardar despesa: ' + err.message, type: 'error' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('Tem a certeza que deseja eliminar esta despesa?')) return;
+  const performDeleteExpense = async (id) => {
     try {
       const expense = expenses.find(e => e.firestoreId === id);
       if (expense?.invoiceFileName) {
@@ -105,8 +108,15 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
         });
       }
     } catch (err) {
-      alert('Erro ao eliminar: ' + err.message);
+      setToast({ message: 'Erro ao eliminar: ' + err.message, type: 'error' });
     }
+  };
+
+  const handleDelete = (id) => {
+    setConfirmDialog({
+      message: 'Tem a certeza que deseja eliminar esta despesa?',
+      onConfirm: () => { setConfirmDialog(null); performDeleteExpense(id); }
+    });
   };
 
   const handleAddType = async (e) => {
@@ -121,21 +131,30 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
       setNewTypeName('');
       setShowTypeForm(false);
     } catch (err) {
-      alert('Erro ao adicionar tipo: ' + err.message);
+      setToast({ message: 'Erro ao adicionar tipo: ' + err.message, type: 'error' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteType = async (typeId, typeName) => {
-    const hasExpenses = expenses.some(e => e.expenseType === typeName);
-    if (hasExpenses) return alert('Não é possível eliminar este tipo pois existem despesas associadas.');
-    if (!confirm('Tem a certeza que deseja eliminar este tipo de despesa?')) return;
+  const performDeleteType = async (typeId) => {
     try {
       await deleteDoc(doc(db, 'condos', selectedCondoId, 'expenseTypes', typeId));
     } catch (err) {
-      alert('Erro ao eliminar tipo: ' + err.message);
+      setToast({ message: 'Erro ao eliminar tipo: ' + err.message, type: 'error' });
     }
+  };
+
+  const handleDeleteType = (typeId, typeName) => {
+    const hasExpenses = expenses.some(e => e.expenseType === typeName);
+    if (hasExpenses) {
+      setToast({ message: 'Não é possível eliminar este tipo pois existem despesas associadas.', type: 'error' });
+      return;
+    }
+    setConfirmDialog({
+      message: 'Tem a certeza que deseja eliminar este tipo de despesa?',
+      onConfirm: () => { setConfirmDialog(null); performDeleteType(typeId); }
+    });
   };
 
   const groupedExpenses = expenses.reduce((acc, expense) => {
@@ -261,7 +280,7 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
     // Get the latest budget (sorted by startDate descending)
     const sortedBudgets = [...(budgets || [])].sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
     const latestBudget = sortedBudgets[0];
-    if (!latestBudget) return alert('Não existe nenhum orçamento configurado.');
+    if (!latestBudget) { setToast({ message: 'Não existe nenhum orçamento configurado.', type: 'error' }); return; }
 
     // Get budget period boundaries
     const start = new Date(latestBudget.startDate);
@@ -286,7 +305,7 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
     // Sort type names alphabetically
     const sortedTypeNames = Object.keys(typeGroups).sort((a, b) => a.localeCompare(b, 'pt'));
 
-    if (sortedTypeNames.length === 0) return alert('Não existem despesas no período do último orçamento.');
+    if (sortedTypeNames.length === 0) { setToast({ message: 'Não existem despesas no período do último orçamento.', type: 'error' }); return; }
 
     const wb = XLSX.utils.book_new();
 
@@ -321,6 +340,13 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
 
   return (
     <div className="space-y-6">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      <ConfirmDialog
+        open={!!confirmDialog}
+        message={confirmDialog?.message}
+        onConfirm={() => confirmDialog?.onConfirm()}
+        onCancel={() => setConfirmDialog(null)}
+      />
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-2">
         <div>
           <h2 className="text-[26px] font-bold text-slate-800 tracking-tight">Despesas</h2>

@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
 import { collection, onSnapshot, addDoc } from 'firebase/firestore';
 import { Plus, Trash2, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
+import Toast from '../components/Toast';
 
 function AssembleiasPage({ db, t, selectedCondoId, users, condo, currentUser }) {
+  const [toast, setToast] = useState(null);
   const [assembleias, setAssembleias] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
@@ -67,7 +69,7 @@ function AssembleiasPage({ db, t, selectedCondoId, users, condo, currentUser }) 
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!numero || !data || !hora || pontos.filter(p => p.trim()).length === 0 || convidados.length === 0) {
-      alert('Preencha todos os campos obrigatórios.');
+      setToast({ message: 'Preencha todos os campos obrigatórios.', type: 'error' });
       return;
     }
     setSending(true);
@@ -197,13 +199,13 @@ function AssembleiasPage({ db, t, selectedCondoId, users, condo, currentUser }) 
         await addDoc(collection(db, 'mail'), mailData);
       }
 
-      alert(t('assembleiaCreated'));
+      setToast({ message: t('assembleiaCreated'), type: 'success' });
       setShowForm(false);
       setConvidadosOpen(false);
       setNumero(''); setData(''); setHora(''); setTipo('geral'); setPontos(['']); setConvidados([]);
     } catch (err) {
       console.error("Erro ao criar assembleia:", err);
-      alert('Erro ao criar assembleia: ' + err.message);
+      setToast({ message: 'Erro ao criar assembleia: ' + err.message, type: 'error' });
     } finally {
       setSending(false);
     }
@@ -213,6 +215,7 @@ function AssembleiasPage({ db, t, selectedCondoId, users, condo, currentUser }) 
 
   return (
     <div className="space-y-6">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <div className="pt-2 flex justify-between items-center">
         <div>
           <h2 className="text-[26px] font-bold text-slate-800 tracking-tight">{t('assembleias')}</h2>

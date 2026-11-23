@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { Home, Plus, X, Edit2, Trash2 } from 'lucide-react';
+import Toast from '../components/Toast';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 function CondosPage({ allCondos, db, t, onFirstCreate }) {
+  const [toast, setToast] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editingCondo, setEditingCondo] = useState(null);
   const [name, setName] = useState('');
@@ -45,23 +49,36 @@ function CondosPage({ allCondos, db, t, onFirstCreate }) {
       setShowForm(false);
       setEditingCondo(null);
     } catch (err) {
-      alert('Erro: ' + err.message);
+      setToast({ message: 'Erro: ' + err.message, type: 'error' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (condoId) => {
-    if (!confirm(t('confirmDeleteCondo'))) return;
+  const performDelete = async (condoId) => {
     try {
       await deleteDoc(doc(db, 'condos', condoId));
     } catch (err) {
-      alert('Erro ao eliminar: ' + err.message);
+      setToast({ message: 'Erro ao eliminar: ' + err.message, type: 'error' });
     }
+  };
+
+  const handleDelete = (condoId) => {
+    setConfirmDialog({
+      message: t('confirmDeleteCondo'),
+      onConfirm: () => { setConfirmDialog(null); performDelete(condoId); }
+    });
   };
 
   return (
     <div className="space-y-6">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      <ConfirmDialog
+        open={!!confirmDialog}
+        message={confirmDialog?.message}
+        onConfirm={() => confirmDialog?.onConfirm()}
+        onCancel={() => setConfirmDialog(null)}
+      />
       <div className="flex justify-between items-center pt-2">
         <div>
           <h2 className="text-[26px] font-bold text-slate-800 tracking-tight">{t('condos')}</h2>

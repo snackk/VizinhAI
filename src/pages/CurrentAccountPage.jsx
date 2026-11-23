@@ -3,8 +3,12 @@ import { jsPDF } from 'jspdf';
 import { setDoc, doc, collection, addDoc, runTransaction, getDocs, deleteDoc, updateDoc, increment } from 'firebase/firestore';
 import { Wallet, CheckCircle, PlusCircle, X, Trash2, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import Toast from '../components/Toast';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo, t, selectedCondoId }) {
+  const [toast, setToast] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const [showExtraForm, setShowExtraForm] = useState(false);
   const [extraMonth, setExtraMonth] = useState('');
   const [extraYear, setExtraYear] = useState('');
@@ -109,16 +113,18 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
   };
 
   const handleAddExtraMonth = async () => {
-    if (!extraMonth || !extraYear) return alert('Preencha mês e ano.');
+    if (!extraMonth || !extraYear) { setToast({ message: 'Preencha mês e ano.', type: 'error' }); return; }
     const monthIdx = parseInt(extraMonth);
     const year = parseInt(extraYear);
     const key = `${year}-${monthIdx}`;
 
     if (budgetMonthKeys.has(key)) {
-      return alert('Este mês já faz parte do orçamento atual.');
+      setToast({ message: 'Este mês já faz parte do orçamento atual.', type: 'error' });
+      return;
     }
     if (extraMonthKeys.includes(key)) {
-      return alert('Este mês extra já foi adicionado.');
+      setToast({ message: 'Este mês extra já foi adicionado.', type: 'error' });
+      return;
     }
 
     const amounts = {};
@@ -131,7 +137,7 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
       }
     }
 
-    if (!hasValues) return alert('Introduza pelo menos um valor de quota.');
+    if (!hasValues) { setToast({ message: 'Introduza pelo menos um valor de quota.', type: 'error' }); return; }
 
     setLoadingExtra(true);
     try {
@@ -151,18 +157,17 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
       setExtraYear('');
       setExtraQuotas({});
     } catch (err) {
-      alert('Erro ao adicionar mês extra: ' + err.message);
+      setToast({ message: 'Erro ao adicionar mês extra: ' + err.message, type: 'error' });
     }
     setLoadingExtra(false);
   };
 
-  const handleDeleteExtraMonth = async (monthKey) => {
-    if (!confirm(`Tem a certeza que deseja remover este mês extra e todas as quotas associadas?`)) return;
+  const performDeleteExtraMonth = async (monthKey) => {
     try {
       const extraQuotasForMonth = quotas.filter(q => q.isExtra && q.monthKey === monthKey);
       for (const q of extraQuotasForMonth) {
         if (q.status === 'paid') {
-          alert('Não é possível remover meses com quotas já pagas.');
+          setToast({ message: 'Não é possível remover meses com quotas já pagas.', type: 'error' });
           return;
         }
       }
@@ -170,8 +175,15 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
         await deleteDoc(doc(db, 'condos', selectedCondoId, 'quotas', q.firestoreId));
       }
     } catch (err) {
-      alert('Erro ao remover mês extra: ' + err.message);
+      setToast({ message: 'Erro ao remover mês extra: ' + err.message, type: 'error' });
     }
+  };
+
+  const handleDeleteExtraMonth = (monthKey) => {
+    setConfirmDialog({
+      message: 'Tem a certeza que deseja remover este mês extra e todas as quotas associadas?',
+      onConfirm: () => { setConfirmDialog(null); performDeleteExtraMonth(monthKey); }
+    });
   };
 
   // Open payment modal when admin clicks a quota cell
@@ -181,12 +193,12 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
     setPaymentAmount(owedAmount.toFixed(2));
   };
 
-  const handlePayment = async () => {
+  const handlePayment = () => {
     if (!paymentModal) return;
     const { userId, monthKey, isExtra, owedAmount } = paymentModal;
     const paid = parseFloat(paymentAmount);
 
-    if (isNaN(paid) || paid <= 0) return alert('Introduza um valor válido.');
+    if (isNaN(paid) || paid <= 0) { setToast({ message: 'Introduza um valor válido.', type: 'error' }); return; }
 
     const user = users.find(u => u.firestoreId === userId);
     const [year, monthIdx] = monthKey.split('-').map(Number);
@@ -197,9 +209,16 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
       ? `Confirma o pagamento de ${paid.toFixed(2)}€ referente a ${monthName} ${year} (${user.fraction})? O excedente de ${overpayment.toFixed(2)}€ será aplicado como crédito no(s) mês(es) seguinte(s). Esta ação é irreversível e enviará um e-mail de recibo.`
       : `Confirma o pagamento de ${paid.toFixed(2)}€ referente a ${monthName} ${year} (${user.fraction})? Esta ação é irreversível e enviará um e-mail de recibo.`;
 
-    if (!confirm(confirmMsg)) {
-      return;
-    }
+    setConfirmDialog({
+      message: confirmMsg,
+      onConfirm: () => { setConfirmDialog(null); performPayment({ userId, monthKey, isExtra, owedAmount, paid }); }
+    });
+  };
+
+  const performPayment = async ({ userId, monthKey, isExtra, owedAmount, paid }) => {
+    const user = users.find(u => u.firestoreId === userId);
+    const [year, monthIdx] = monthKey.split('-').map(Number);
+    const monthName = t(`months.${monthIdx}`);
 
     setPaymentLoading(true);
     try {
@@ -475,13 +494,13 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
         }
       } catch (mailErr) {
         console.error("Erro ao enviar email:", mailErr);
-        alert('Quota marcada como paga, mas houve um erro ao enviar o e-mail: ' + mailErr.message);
+        setToast({ message: 'Quota marcada como paga, mas houve um erro ao enviar o e-mail: ' + mailErr.message, type: 'error' });
       }
 
       setPaymentModal(null);
       setPaymentAmount('');
     } catch (err) {
-      alert('Erro ao processar pagamento: ' + err.message);
+      setToast({ message: 'Erro ao processar pagamento: ' + err.message, type: 'error' });
     }
     setPaymentLoading(false);
   };
@@ -532,6 +551,13 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
 
   return (
     <div className="space-y-6">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      <ConfirmDialog
+        open={!!confirmDialog}
+        message={confirmDialog?.message}
+        onConfirm={() => confirmDialog?.onConfirm()}
+        onCancel={() => setConfirmDialog(null)}
+      />
       <div className="pt-2 flex items-center justify-between">
         <div>
           <h2 className="text-[26px] font-bold text-slate-800">Conta Corrente</h2>

@@ -4,8 +4,12 @@ import { getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail, signOu
 import { setDoc, updateDoc, deleteDoc, doc, collection } from 'firebase/firestore';
 import { firebaseConfig, auth } from '../config/firebase.js';
 import { Plus, X, Edit2, Trash2, Eye } from 'lucide-react';
+import Toast from '../components/Toast';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 function FractionsPage({ users, quotas, isAdmin, db, appId, budgets, currentUser, t, selectedCondoId, onImpersonate }) {
+  const [toast, setToast] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [newName, setNewName] = useState('');
@@ -50,8 +54,7 @@ function FractionsPage({ users, quotas, isAdmin, db, appId, budgets, currentUser
     }
   }, [editingUser]);
 
-  const handlePromoteAdmin = async (user) => {
-    if (!confirm(t('promoteConfirm', { name: user.name }))) return;
+  const performPromoteAdmin = async (user) => {
     setLoading(true);
     try {
       const existingAdmin = users.find(u => u.role === 'admin' && u.firestoreId !== user.firestoreId);
@@ -61,12 +64,19 @@ function FractionsPage({ users, quotas, isAdmin, db, appId, budgets, currentUser
       }
       await updateDoc(doc(db, 'condos', selectedCondoId, 'users', user.firestoreId), { role: 'admin' });
       await updateDoc(doc(db, 'users', user.firestoreId), { role: 'admin' });
-      alert('Utilizador promovido a administrador.');
+      setToast({ message: 'Utilizador promovido a administrador.', type: 'success' });
     } catch (err) {
-      alert('Erro ao promover administrador: ' + err.message);
+      setToast({ message: 'Erro ao promover administrador: ' + err.message, type: 'error' });
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePromoteAdmin = (user) => {
+    setConfirmDialog({
+      message: t('promoteConfirm', { name: user.name }),
+      onConfirm: () => { setConfirmDialog(null); performPromoteAdmin(user); }
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -115,14 +125,20 @@ function FractionsPage({ users, quotas, isAdmin, db, appId, budgets, currentUser
     }
   };
 
-  const handleDeleteUser = async (user) => {
-    if (!confirm(`Tem a certeza que deseja eliminar o utilizador ${user.name} deste condomínio?`)) return;
+  const performDeleteUser = async (user) => {
     try {
       await deleteDoc(doc(db, 'condos', selectedCondoId, 'users', user.firestoreId));
-      alert('Utilizador eliminado do condomínio com sucesso.');
+      setToast({ message: 'Utilizador eliminado do condomínio com sucesso.', type: 'success' });
     } catch (err) {
-      alert('Erro ao eliminar: ' + err.message);
+      setToast({ message: 'Erro ao eliminar: ' + err.message, type: 'error' });
     }
+  };
+
+  const handleDeleteUser = (user) => {
+    setConfirmDialog({
+      message: `Tem a certeza que deseja eliminar o utilizador ${user.name} deste condomínio?`,
+      onConfirm: () => { setConfirmDialog(null); performDeleteUser(user); }
+    });
   };
 
   const fractionsList = [...users].sort((a, b) => (a.fraction || '').localeCompare(b.fraction || '', 'pt')).map(user => {
@@ -141,6 +157,13 @@ function FractionsPage({ users, quotas, isAdmin, db, appId, budgets, currentUser
 
   return (
     <div className="space-y-6">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      <ConfirmDialog
+        open={!!confirmDialog}
+        message={confirmDialog?.message}
+        onConfirm={() => confirmDialog?.onConfirm()}
+        onCancel={() => setConfirmDialog(null)}
+      />
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-2">
         <div><h2 className="text-[26px] font-bold text-slate-800">Frações</h2></div>
         {isAdmin && (
