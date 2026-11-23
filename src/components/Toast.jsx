@@ -1,12 +1,16 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 function Toast({ message, type, onClose }) {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      onClose();
+      onCloseRef.current();
     }, 3000);
     return () => clearTimeout(timer);
-  }, [message, type, onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [message, type]);
 
   if (!message) return null;
 
