@@ -164,7 +164,7 @@ export default function CalendarPage({ db, selectedCondoId, t }) {
                   </div>
                   <div className="flex items-center gap-1">
                     {isExpanded && (
-                      <button onClick={(e) => { e.stopPropagation(); handleDelete(event.id); }} className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-xl transition-colors">
+                      <button onClick={(e) => { e.stopPropagation(); handleDelete(event.id); }} aria-label={t('delete')} className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-xl transition-colors">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     )}

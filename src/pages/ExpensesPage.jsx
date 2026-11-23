@@ -5,7 +5,7 @@ import { Plus, X, Receipt, Edit2, Trash2, Calendar, ChevronDown, ChevronUp, File
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 import * as XLSX from 'xlsx';
 
-function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, db, appId, storage, selectedCondoId }) {
+function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, db, appId, storage, selectedCondoId, t }) {
   const [showForm, setShowForm] = useState(false);
   const [showTypeForm, setShowTypeForm] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
@@ -356,7 +356,7 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
             {(expenseTypes || []).map(type => (
               <div key={type.firestoreId} className="flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-lg group">
                 <span className="text-sm font-medium text-slate-700">{type.name}</span>
-                <button onClick={() => handleDeleteType(type.firestoreId, type.name)} className="text-slate-400 hover:text-red-500 transition-colors">
+                <button onClick={() => handleDeleteType(type.firestoreId, type.name)} aria-label={t('delete')} className="text-slate-400 hover:text-red-500 transition-colors">
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -525,8 +525,8 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
                                       {isAdmin && (
                                         <td className="px-4 py-3">
                                           <div className="flex items-center justify-center gap-1">
-                                            <button onClick={() => setEditingExpense(item)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
-                                            <button onClick={() => handleDelete(item.firestoreId)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                            <button onClick={() => setEditingExpense(item)} aria-label={t('edit')} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
+                                            <button onClick={() => handleDelete(item.firestoreId)} aria-label={t('delete')} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
                                           </div>
                                         </td>
                                       )}

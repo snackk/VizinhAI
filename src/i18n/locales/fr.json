@@ -84,6 +84,8 @@
   "calendarDeleteConfirm": "Êtes-vous sûr de vouloir supprimer cet événement ?",
   "calendarNoEvents": "Aucun événement prévu.",
   "accountBalance": "Solde Comptable",
-  "bankBalance": "Solde du compte bancaire"
+  "bankBalance": "Solde du compte bancaire",
+  "edit": "Modifier",
+  "delete": "Supprimer"
 }
 

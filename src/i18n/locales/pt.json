@@ -99,6 +99,8 @@
   "calendarDeleteConfirm": "Tem a certeza que deseja eliminar este evento?",
   "calendarNoEvents": "Nenhum evento agendado.",
   "accountBalance": "Saldo Contabilístico",
-  "bankBalance": "Saldo na conta bancária"
+  "bankBalance": "Saldo na conta bancária",
+  "edit": "Editar",
+  "delete": "Eliminar"
 }
 
