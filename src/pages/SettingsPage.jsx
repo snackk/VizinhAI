@@ -37,11 +37,11 @@ function SettingsPage({ currentUser, db, appId, t, selectedCondoId }) {
         {message.text && <div className={`p-4 rounded-xl text-sm font-medium ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{message.text}</div>}
         <div>
           <label className="block text-sm font-semibold mb-2 ml-1 text-slate-700">{t('nameLabel')}</label>
-          <input required type="text" className="w-full px-5 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={name} onChange={e => setName(e.target.value)} />
+          <input required type="text" autoComplete="name" className="w-full px-5 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" value={name} onChange={e => setName(e.target.value)} />
         </div>
         <div>
           <label className="block text-sm font-semibold mb-2 ml-1 text-slate-700">{t('phoneLabel')}</label>
-          <input type="text" className="w-full px-5 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" placeholder={t('phonePlaceholder')} value={phone} onChange={e => setPhone(e.target.value)} />
+          <input type="text" autoComplete="tel" className="w-full px-5 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" placeholder={t('phonePlaceholder')} value={phone} onChange={e => setPhone(e.target.value)} />
         </div>
         <div>
           <label className="block text-sm font-semibold mb-2 ml-1 text-slate-700">{t('nifLabel')}</label>

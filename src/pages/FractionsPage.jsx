@@ -157,11 +157,11 @@ function FractionsPage({ users, quotas, isAdmin, db, appId, budgets, currentUser
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-500 ml-1">Nome</label>
-              <input required type="text" placeholder="Nome completo" value={newName} onChange={e => setNewName(e.target.value)} className="w-full px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
+              <input required type="text" autoComplete="name" placeholder="Nome completo" value={newName} onChange={e => setNewName(e.target.value)} className="w-full px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-500 ml-1">E-mail</label>
-              <input required type="email" placeholder="E-mail" value={newEmail} onChange={e => setNewEmail(e.target.value)} disabled={!!editingUser} className="w-full px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" />
+              <input required type="email" autoComplete="email" placeholder="E-mail" value={newEmail} onChange={e => setNewEmail(e.target.value)} disabled={!!editingUser} className="w-full px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-500 ml-1">Fração</label>
@@ -173,7 +173,7 @@ function FractionsPage({ users, quotas, isAdmin, db, appId, budgets, currentUser
             </div>
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-500 ml-1">{t('phoneLabel')}</label>
-              <input type="text" placeholder={t('phonePlaceholder')} value={newPhone} onChange={e => setNewPhone(e.target.value)} className="w-full px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
+              <input type="text" autoComplete="tel" placeholder={t('phonePlaceholder')} value={newPhone} onChange={e => setNewPhone(e.target.value)} className="w-full px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-500 ml-1">{t('nifLabel')}</label>
