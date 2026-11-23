@@ -13,7 +13,7 @@ function SettingsPage({ currentUser, db, appId, t, selectedCondoId }) {
     e.preventDefault();
     setSaving(true); setMessage({ type: '', text: '' });
     try {
-      const userUpdate = { name, phone, nif: parseInt(nif) || null, language };
+      const userUpdate = { name, phone, nif: nif || null, language };
       await updateDoc(doc(db, 'users', currentUser.firestoreId), userUpdate);
       if (selectedCondoId) {
         try {
@@ -45,7 +45,7 @@ function SettingsPage({ currentUser, db, appId, t, selectedCondoId }) {
         </div>
         <div>
           <label className="block text-sm font-semibold mb-2 ml-1 text-slate-700">{t('nifLabel')}</label>
-          <input type="number" className="w-full px-5 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" placeholder={t('nifPlaceholder')} value={nif} onChange={e => setNif(e.target.value)} />
+          <input type="text" inputMode="numeric" pattern="[0-9]*" className="w-full px-5 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" placeholder={t('nifPlaceholder')} value={nif} onChange={e => setNif(e.target.value.replace(/\D/g, '').slice(0, 9))} />
         </div>
         <div>
           <label className="block text-sm font-semibold mb-2 ml-1 text-slate-700">{t('languageLabel')}</label>

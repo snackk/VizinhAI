@@ -75,10 +75,10 @@ function FractionsPage({ users, quotas, isAdmin, db, appId, budgets, currentUser
     try {
       if (editingUser) {
         await updateDoc(doc(db, 'condos', selectedCondoId, 'users', editingUser.firestoreId), {
-          name: newName, fraction: newFraction, permilagem: parseFloat(newPermilagem) || 0, phone: newPhone, nif: parseInt(newNif) || null,
+          name: newName, fraction: newFraction, permilagem: parseFloat(newPermilagem) || 0, phone: newPhone, nif: newNif || null,
         });
         await updateDoc(doc(db, 'users', editingUser.firestoreId), {
-          name: newName, permilagem: parseFloat(newPermilagem) || 0, phone: newPhone, nif: parseInt(newNif) || null,
+          name: newName, permilagem: parseFloat(newPermilagem) || 0, phone: newPhone, nif: newNif || null,
         });
         setMsg({ type: 'success', text: 'Condómino atualizado!' });
         setTimeout(() => { setShowForm(false); setEditingUser(null); }, 2000);
@@ -90,14 +90,14 @@ function FractionsPage({ users, quotas, isAdmin, db, appId, budgets, currentUser
 
         const newUser = {
           id: userCred.user.uid, name: newName, email: newEmail, fraction: newFraction,
-          permilagem: parseFloat(newPermilagem) || 0, phone: newPhone, nif: parseInt(newNif) || null,
+          permilagem: parseFloat(newPermilagem) || 0, phone: newPhone, nif: newNif || null,
           role: 'user', condoId: selectedCondoId
         };
 
         await setDoc(doc(db, 'condos', selectedCondoId, 'users', userCred.user.uid), newUser);
         await setDoc(doc(db, 'users', userCred.user.uid), {
           name: newName, email: newEmail, role: 'user',
-          permilagem: parseFloat(newPermilagem) || 0, phone: newPhone, nif: parseInt(newNif) || null,
+          permilagem: parseFloat(newPermilagem) || 0, phone: newPhone, nif: newNif || null,
           condoIds: [selectedCondoId]
         }, { merge: true });
 
@@ -177,7 +177,7 @@ function FractionsPage({ users, quotas, isAdmin, db, appId, budgets, currentUser
             </div>
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-500 ml-1">{t('nifLabel')}</label>
-              <input type="number" placeholder={t('nifPlaceholder')} value={newNif} onChange={e => setNewNif(e.target.value)} className="w-full px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
+              <input type="text" inputMode="numeric" pattern="[0-9]*" placeholder={t('nifPlaceholder')} value={newNif} onChange={e => setNewNif(e.target.value.replace(/\D/g, '').slice(0, 9))} className="w-full px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
           </div>
           <button type="submit" disabled={loading} className="mt-5 w-full bg-slate-900 text-white px-6 py-4 rounded-xl font-semibold disabled:opacity-50 transition-all active:scale-[0.98]">
