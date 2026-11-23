@@ -1,22 +1,15 @@
-import React, { useEffect } from 'react';
+import React from 'react';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 function ConfirmDialog({ open, message, onConfirm, onCancel }) {
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        onCancel();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [open, onCancel]);
+  const dialogRef = useModalA11y(open, onCancel);
 
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         className="bg-white rounded-2xl shadow-lg max-w-sm w-full p-6 space-y-5"
