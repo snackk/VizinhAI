@@ -97,18 +97,18 @@ function CondoPage({ condo, isAdmin, db, appId, users, t, selectedCondoId }) {
               <div className="bg-slate-50 rounded-2xl overflow-hidden border border-slate-100">
                 <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Morada Oficial</p>
+                    <p className="text-xs font-medium text-slate-500">Morada Oficial</p>
                     <p className="text-slate-700 font-medium text-lg leading-relaxed">{condo.address}</p>
                   </div>
                   
                   <div className="space-y-6">
                     <div className="space-y-1">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Contribuinte (NIF)</p>
+                      <p className="text-xs font-medium text-slate-500">Contribuinte (NIF)</p>
                       <p className="text-slate-900 font-bold text-xl tracking-tight">{condo.nif}</p>
                     </div>
                     
                     <div className="space-y-1">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">IBAN para Pagamentos</p>
+                      <p className="text-xs font-medium text-slate-500">IBAN para Pagamentos</p>
                       <div className="bg-white p-4 rounded-2xl border border-slate-100 flex items-center justify-between">
                         <p className="text-blue-700 font-mono font-bold text-lg">{condo.iban}</p>
                         <button onClick={() => {navigator.clipboard.writeText(condo.iban); setToast({ message: 'IBAN copiado!', type: 'success' });}} className="text-blue-600 hover:bg-blue-100 p-2 rounded-lg transition-colors">
@@ -148,15 +148,15 @@ function CondoPage({ condo, isAdmin, db, appId, users, t, selectedCondoId }) {
                       </div>
                       <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 w-full">
                         <div className="space-y-1">
-                          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{t('adminName')}</p>
+                          <p className="text-xs font-medium text-slate-500">{t('adminName')}</p>
                           <p className="text-slate-800 font-bold text-lg">{currentAdmin.name}</p>
                         </div>
                         <div className="space-y-1">
-                          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{t('adminEmail')}</p>
+                          <p className="text-xs font-medium text-slate-500">{t('adminEmail')}</p>
                           <p className="text-slate-900 font-medium">vizinhaipt@gmail.com</p>
                         </div>
                         <div className="space-y-1">
-                          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{t('adminPhone')}</p>
+                          <p className="text-xs font-medium text-slate-500">{t('adminPhone')}</p>
                           <p className="text-slate-900 font-medium">{currentAdmin.phone || '---'}</p>
                         </div>
                       </div>

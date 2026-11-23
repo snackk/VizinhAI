@@ -780,7 +780,7 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
                           {isPaid ? (
                             <div className="flex flex-col items-center">
                               <CheckCircle className="w-4 h-4 mb-0.5" />
-                              <span className="text-[10px] font-bold uppercase tracking-tight">Pago</span>
+                              <span className="text-[10px] font-bold tracking-tight">Pago</span>
                             </div>
                           ) : (
                             <div className="flex flex-col items-center">
@@ -811,7 +811,7 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
                           {isPaid ? (
                             <div className="flex flex-col items-center">
                               <CheckCircle className="w-4 h-4 mb-0.5" />
-                              <span className="text-[10px] font-bold uppercase tracking-tight">Pago</span>
+                              <span className="text-[10px] font-bold tracking-tight">Pago</span>
                               {quota.paidAmount !== undefined && quota.paidAmount < baseTotal + (quota.carryoverAmount || 0) - 0.01 && (
                                 <span className="text-[9px] text-amber-600 font-medium">{formatCurrency(quota.paidAmount, i18n.language)}</span>
                               )}
@@ -822,7 +822,7 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
                           ) : totalWithCarry <= 0 ? (
                             <div className="flex flex-col items-center">
                               <CheckCircle className="w-4 h-4 mb-0.5 text-blue-500" />
-                              <span className="text-[10px] font-bold uppercase tracking-tight text-blue-600">Crédito</span>
+                              <span className="text-[10px] font-bold tracking-tight text-blue-600">Crédito</span>
                               <span className="text-[9px] text-blue-500 font-medium">coberto</span>
                             </div>
                           ) : (

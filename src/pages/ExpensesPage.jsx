@@ -401,11 +401,11 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
           <h3 className="font-bold text-lg text-slate-800">{editingExpense ? 'Editar Despesa' : 'Nova Despesa'}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-500 ml-1 uppercase tracking-wider">Data</label>
+              <label className="text-xs font-medium text-slate-500 ml-1">Data</label>
               <input required type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-500 ml-1 uppercase tracking-wider">Tipo de Despesa</label>
+              <label className="text-xs font-medium text-slate-500 ml-1">Tipo de Despesa</label>
               <select required value={expenseType} onChange={e => setExpenseType(e.target.value)} className="w-full px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all">
                 <option value="">Selecionar tipo...</option>
                 {[...(expenseTypes || [])].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt')).map(type => (
@@ -414,11 +414,11 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-500 ml-1 uppercase tracking-wider">Rubrica / Descrição</label>
+              <label className="text-xs font-medium text-slate-500 ml-1">Rubrica / Descrição</label>
               <input required placeholder="Ex: Limpeza, Elevador..." value={rubric} onChange={e => setRubric(e.target.value)} className="w-full px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-500 ml-1 uppercase tracking-wider">Valor (€)</label>
+              <label className="text-xs font-medium text-slate-500 ml-1">Valor (€)</label>
               <div className="relative">
                 <input required type="number" step="0.01" placeholder="0.00" value={value} onChange={e => setValue(e.target.value)} className="w-full px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all pr-8" />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">€</span>
@@ -427,7 +427,7 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-500 ml-1 uppercase tracking-wider">
+            <label className="text-xs font-medium text-slate-500 ml-1">
               <Paperclip className="w-3.5 h-3.5 inline mr-1" />
               Fatura (PDF, Imagem) — Opcional
             </label>
@@ -475,7 +475,7 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
           const isPeriodExpanded = expandedPeriods[period.id] || false;
 
           return (
-            <div key={period.id} className={`bg-white rounded-3xl border ${period.isCurrent ? 'border-blue-100 ring-1 ring-blue-50' : 'border-slate-100'} shadow-sm overflow-hidden`}>
+            <div key={period.id} className={`bg-white rounded-3xl border overflow-hidden ${period.isCurrent ? 'border-slate-300 border-l-4 border-l-blue-500 shadow-sm' : 'border-slate-100'}`}>
               <div className={`p-5 flex justify-between items-center cursor-pointer transition-colors ${!isPeriodExpanded ? 'hover:bg-slate-50' : ''}`} onClick={() => setExpandedPeriods({...expandedPeriods, [period.id]: !isPeriodExpanded})}>
                 <div className="flex items-center gap-4">
                   <div className={`p-3 rounded-2xl ${period.isCurrent ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-100 text-slate-500'}`}>
@@ -488,7 +488,7 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
                 </div>
                 <div className="flex items-center gap-6">
                   <div className="text-right hidden sm:block">
-                    <p className="text-xs font-semibold uppercase text-slate-400 tracking-wider">Total Período</p>
+                    <p className="text-xs font-medium text-slate-500">Total Período</p>
                     <p className={`font-bold text-lg ${period.isCurrent ? 'text-blue-600' : 'text-slate-900'}`}>{formatCurrency(period.total, i18n.language)}</p>
                   </div>
                   {isPeriodExpanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}

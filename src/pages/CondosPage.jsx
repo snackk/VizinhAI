@@ -94,11 +94,11 @@ function CondosPage({ allCondos, db, t, onFirstCreate }) {
           <h3 className="font-bold text-lg text-slate-800">{editingCondo ? t('editCondo') : t('createCondo')}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-500 ml-1 uppercase">{t('condoName')}</label>
+              <label className="text-xs font-medium text-slate-500 ml-1">{t('condoName')}</label>
               <input required value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3 border border-slate-200 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-500 ml-1 uppercase">{t('condoAddress')}</label>
+              <label className="text-xs font-medium text-slate-500 ml-1">{t('condoAddress')}</label>
               <input required value={address} onChange={e => setAddress(e.target.value)} className="w-full px-4 py-3 border border-slate-200 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <div className="space-y-1">

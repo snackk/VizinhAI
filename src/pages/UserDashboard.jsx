@@ -96,7 +96,7 @@ function UserDashboard({ user, quotas, expenses, budgets, users, assembleias, co
         >
           <div className="flex items-start justify-between">
             <div>
-              <p className={`text-sm font-semibold uppercase tracking-wider ${hasDebt ? 'text-red-800/70' : 'text-green-800/70'}`}>{hasDebt ? t('amountToPay') : t('regularSituation')}</p>
+              <p className={`text-sm font-medium ${hasDebt ? 'text-red-800/70' : 'text-green-800/70'}`}>{hasDebt ? t('amountToPay') : t('regularSituation')}</p>
               <h3 className={`text-4xl font-bold mt-2 tracking-tight ${hasDebt ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(pendingAmount, i18n.language)}</h3>
             </div>
             <div className={`p-3.5 rounded-2xl ${hasDebt ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
@@ -106,7 +106,7 @@ function UserDashboard({ user, quotas, expenses, budgets, users, assembleias, co
           
           {hasDebt && isExpanded && (
             <div className="mt-6 pt-6 border-t border-red-200/50 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-              <p className="text-xs font-bold text-red-800/60 uppercase tracking-widest mb-4">{t('overdueMonths')}</p>
+              <p className="text-xs font-medium text-red-800/60 mb-4">{t('overdueMonths')}</p>
               {extraPendingQuotas.map((q, idx) => {
                 const [y, m] = q.monthKey.split('-').map(Number);
                 return (
@@ -133,7 +133,7 @@ function UserDashboard({ user, quotas, expenses, budgets, users, assembleias, co
         <div className="p-6 rounded-3xl border bg-blue-50 border-blue-100 shadow-sm">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-600/70 mb-1">{t('accountBalance')}</p>
+              <p className="text-xs font-medium text-slate-500 mb-1">{t('accountBalance')}</p>
               <h3 className="text-3xl font-bold text-slate-900 tracking-tight">{formatCurrency(condo?.saldoContabilistico || 0, i18n.language)}</h3>
               <p className="text-[13px] text-slate-500 mt-2 font-medium">{t('bankBalance')}</p>
             </div>

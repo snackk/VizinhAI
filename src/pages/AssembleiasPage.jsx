@@ -294,7 +294,7 @@ function AssembleiasPage({ db, t, selectedCondoId, users, condo, currentUser }) 
             {convidadosOpen && (
               <div className="absolute z-20 mt-2 w-full bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('convidados')}</span>
+                  <span className="text-xs font-medium text-slate-500">{t('convidados')}</span>
                   <button type="button" onClick={selectAllConvidados} className="text-xs text-blue-600 font-semibold hover:underline">
                     {convidados.length === users.length ? 'Desselecionar Todos' : 'Selecionar Todos'}
                   </button>
