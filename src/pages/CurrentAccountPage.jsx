@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useModalA11y } from '../hooks/useModalA11y';
 import { jsPDF } from 'jspdf';
 import { setDoc, doc, collection, addDoc, runTransaction, getDocs, deleteDoc, updateDoc, increment } from 'firebase/firestore';
 import { Wallet, CheckCircle, PlusCircle, X, Trash2, FileSpreadsheet } from 'lucide-react';
@@ -18,6 +19,11 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
   const [paymentModal, setPaymentModal] = useState(null); // { userId, monthKey, isExtra, owedAmount }
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentLoading, setPaymentLoading] = useState(false);
+
+  const closePaymentModal = useCallback(() => { setPaymentModal(null); setPaymentAmount(''); }, []);
+  const closeExtraForm = useCallback(() => setShowExtraForm(false), []);
+  const paymentModalRef = useModalA11y(!!paymentModal, closePaymentModal);
+  const extraFormModalRef = useModalA11y(showExtraForm, closeExtraForm);
 
   const sortedBudgets = [...budgets].sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
   const currentBudget = sortedBudgets[0];
@@ -587,11 +593,11 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
 
       {/* Payment Modal */}
       {paymentModal && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => { setPaymentModal(null); setPaymentAmount(''); }}>
-          <div className="bg-white rounded-3xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={closePaymentModal}>
+          <div ref={paymentModalRef} role="dialog" aria-modal="true" className="bg-white rounded-3xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-slate-800">Registar Pagamento</h3>
-              <button onClick={() => { setPaymentModal(null); setPaymentAmount(''); }} className="p-2 hover:bg-slate-100 rounded-xl">
+              <button onClick={closePaymentModal} className="p-2 hover:bg-slate-100 rounded-xl">
                 <X className="w-5 h-5 text-slate-400" />
               </button>
             </div>
@@ -649,11 +655,11 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
 
       {/* Modal para adicionar mês extra */}
       {showExtraForm && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setShowExtraForm(false)}>
-          <div className="bg-white rounded-3xl p-6 w-full max-w-lg max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={closeExtraForm}>
+          <div ref={extraFormModalRef} role="dialog" aria-modal="true" className="bg-white rounded-3xl p-6 w-full max-w-lg max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-bold text-slate-800">Adicionar Mês Extra</h3>
-              <button onClick={() => setShowExtraForm(false)} className="p-2 hover:bg-slate-100 rounded-xl">
+              <button onClick={closeExtraForm} className="p-2 hover:bg-slate-100 rounded-xl">
                 <X className="w-5 h-5 text-slate-400" />
               </button>
             </div>
