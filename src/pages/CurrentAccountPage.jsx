@@ -1,10 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useModalA11y } from '../hooks/useModalA11y';
 import { jsPDF } from 'jspdf';
 import { setDoc, doc, collection, addDoc, runTransaction, getDocs, deleteDoc, updateDoc, increment } from 'firebase/firestore';
 import { Wallet, CheckCircle, PlusCircle, X, Trash2, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import Toast from '../components/Toast';
+import ConfirmDialog from '../components/ConfirmDialog';
+import i18n from '../i18n';
+import { formatCurrency } from '../utils/formatCurrency';
 
 function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo, t, selectedCondoId }) {
+  const [toast, setToast] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const [showExtraForm, setShowExtraForm] = useState(false);
   const [extraMonth, setExtraMonth] = useState('');
   const [extraYear, setExtraYear] = useState('');
@@ -14,6 +21,11 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
   const [paymentModal, setPaymentModal] = useState(null); // { userId, monthKey, isExtra, owedAmount }
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentLoading, setPaymentLoading] = useState(false);
+
+  const closePaymentModal = useCallback(() => { setPaymentModal(null); setPaymentAmount(''); }, []);
+  const closeExtraForm = useCallback(() => setShowExtraForm(false), []);
+  const paymentModalRef = useModalA11y(!!paymentModal, closePaymentModal);
+  const extraFormModalRef = useModalA11y(showExtraForm, closeExtraForm);
 
   const sortedBudgets = [...budgets].sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
   const currentBudget = sortedBudgets[0];
@@ -109,16 +121,18 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
   };
 
   const handleAddExtraMonth = async () => {
-    if (!extraMonth || !extraYear) return alert('Preencha mês e ano.');
+    if (!extraMonth || !extraYear) { setToast({ message: 'Preencha mês e ano.', type: 'error' }); return; }
     const monthIdx = parseInt(extraMonth);
     const year = parseInt(extraYear);
     const key = `${year}-${monthIdx}`;
 
     if (budgetMonthKeys.has(key)) {
-      return alert('Este mês já faz parte do orçamento atual.');
+      setToast({ message: 'Este mês já faz parte do orçamento atual.', type: 'error' });
+      return;
     }
     if (extraMonthKeys.includes(key)) {
-      return alert('Este mês extra já foi adicionado.');
+      setToast({ message: 'Este mês extra já foi adicionado.', type: 'error' });
+      return;
     }
 
     const amounts = {};
@@ -131,7 +145,7 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
       }
     }
 
-    if (!hasValues) return alert('Introduza pelo menos um valor de quota.');
+    if (!hasValues) { setToast({ message: 'Introduza pelo menos um valor de quota.', type: 'error' }); return; }
 
     setLoadingExtra(true);
     try {
@@ -151,18 +165,17 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
       setExtraYear('');
       setExtraQuotas({});
     } catch (err) {
-      alert('Erro ao adicionar mês extra: ' + err.message);
+      setToast({ message: 'Erro ao adicionar mês extra: ' + err.message, type: 'error' });
     }
     setLoadingExtra(false);
   };
 
-  const handleDeleteExtraMonth = async (monthKey) => {
-    if (!confirm(`Tem a certeza que deseja remover este mês extra e todas as quotas associadas?`)) return;
+  const performDeleteExtraMonth = async (monthKey) => {
     try {
       const extraQuotasForMonth = quotas.filter(q => q.isExtra && q.monthKey === monthKey);
       for (const q of extraQuotasForMonth) {
         if (q.status === 'paid') {
-          alert('Não é possível remover meses com quotas já pagas.');
+          setToast({ message: 'Não é possível remover meses com quotas já pagas.', type: 'error' });
           return;
         }
       }
@@ -170,8 +183,15 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
         await deleteDoc(doc(db, 'condos', selectedCondoId, 'quotas', q.firestoreId));
       }
     } catch (err) {
-      alert('Erro ao remover mês extra: ' + err.message);
+      setToast({ message: 'Erro ao remover mês extra: ' + err.message, type: 'error' });
     }
+  };
+
+  const handleDeleteExtraMonth = (monthKey) => {
+    setConfirmDialog({
+      message: 'Tem a certeza que deseja remover este mês extra e todas as quotas associadas?',
+      onConfirm: () => { setConfirmDialog(null); performDeleteExtraMonth(monthKey); }
+    });
   };
 
   // Open payment modal when admin clicks a quota cell
@@ -181,12 +201,12 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
     setPaymentAmount(owedAmount.toFixed(2));
   };
 
-  const handlePayment = async () => {
+  const handlePayment = () => {
     if (!paymentModal) return;
     const { userId, monthKey, isExtra, owedAmount } = paymentModal;
     const paid = parseFloat(paymentAmount);
 
-    if (isNaN(paid) || paid <= 0) return alert('Introduza um valor válido.');
+    if (isNaN(paid) || paid <= 0) { setToast({ message: 'Introduza um valor válido.', type: 'error' }); return; }
 
     const user = users.find(u => u.firestoreId === userId);
     const [year, monthIdx] = monthKey.split('-').map(Number);
@@ -194,12 +214,19 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
 
     const overpayment = paid > owedAmount + 0.01 ? Math.round((paid - owedAmount) * 100) / 100 : 0;
     const confirmMsg = overpayment > 0
-      ? `Confirma o pagamento de ${paid.toFixed(2)}€ referente a ${monthName} ${year} (${user.fraction})? O excedente de ${overpayment.toFixed(2)}€ será aplicado como crédito no(s) mês(es) seguinte(s). Esta ação é irreversível e enviará um e-mail de recibo.`
-      : `Confirma o pagamento de ${paid.toFixed(2)}€ referente a ${monthName} ${year} (${user.fraction})? Esta ação é irreversível e enviará um e-mail de recibo.`;
+      ? `Confirma o pagamento de ${formatCurrency(paid, i18n.language)} referente a ${monthName} ${year} (${user.fraction})? O excedente de ${formatCurrency(overpayment, i18n.language)} será aplicado como crédito no(s) mês(es) seguinte(s). Esta ação é irreversível e enviará um e-mail de recibo.`
+      : `Confirma o pagamento de ${formatCurrency(paid, i18n.language)} referente a ${monthName} ${year} (${user.fraction})? Esta ação é irreversível e enviará um e-mail de recibo.`;
 
-    if (!confirm(confirmMsg)) {
-      return;
-    }
+    setConfirmDialog({
+      message: confirmMsg,
+      onConfirm: () => { setConfirmDialog(null); performPayment({ userId, monthKey, isExtra, owedAmount, paid }); }
+    });
+  };
+
+  const performPayment = async ({ userId, monthKey, isExtra, owedAmount, paid }) => {
+    const user = users.find(u => u.firestoreId === userId);
+    const [year, monthIdx] = monthKey.split('-').map(Number);
+    const monthName = t(`months.${monthIdx}`);
 
     setPaymentLoading(true);
     try {
@@ -475,13 +502,13 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
         }
       } catch (mailErr) {
         console.error("Erro ao enviar email:", mailErr);
-        alert('Quota marcada como paga, mas houve um erro ao enviar o e-mail: ' + mailErr.message);
+        setToast({ message: 'Quota marcada como paga, mas houve um erro ao enviar o e-mail: ' + mailErr.message, type: 'error' });
       }
 
       setPaymentModal(null);
       setPaymentAmount('');
     } catch (err) {
-      alert('Erro ao processar pagamento: ' + err.message);
+      setToast({ message: 'Erro ao processar pagamento: ' + err.message, type: 'error' });
     }
     setPaymentLoading(false);
   };
@@ -532,6 +559,13 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
 
   return (
     <div className="space-y-6">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      <ConfirmDialog
+        open={!!confirmDialog}
+        message={confirmDialog?.message}
+        onConfirm={() => confirmDialog?.onConfirm()}
+        onCancel={() => setConfirmDialog(null)}
+      />
       <div className="pt-2 flex items-center justify-between">
         <div>
           <h2 className="text-[26px] font-bold text-slate-800">Conta Corrente</h2>
@@ -561,11 +595,11 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
 
       {/* Payment Modal */}
       {paymentModal && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => { setPaymentModal(null); setPaymentAmount(''); }}>
-          <div className="bg-white rounded-3xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={closePaymentModal}>
+          <div ref={paymentModalRef} role="dialog" aria-modal="true" className="bg-white rounded-3xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-slate-800">Registar Pagamento</h3>
-              <button onClick={() => { setPaymentModal(null); setPaymentAmount(''); }} className="p-2 hover:bg-slate-100 rounded-xl">
+              <button onClick={closePaymentModal} className="p-2 hover:bg-slate-100 rounded-xl">
                 <X className="w-5 h-5 text-slate-400" />
               </button>
             </div>
@@ -581,7 +615,7 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
                     <p className="text-sm text-slate-500 mt-2">Referência</p>
                     <p className="font-semibold text-slate-700 capitalize">{t(`months.${monthIdx}`)} {year} {paymentModal.isExtra && <span className="text-amber-600 text-xs">(Extra)</span>}</p>
                     <p className="text-sm text-slate-500 mt-2">Valor em dívida</p>
-                    <p className="font-bold text-red-600 text-xl">{paymentModal.owedAmount.toFixed(2)} €</p>
+                    <p className="font-bold text-red-600 text-xl">{formatCurrency(paymentModal.owedAmount, i18n.language)}</p>
                   </div>
 
                   <div>
@@ -602,7 +636,7 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
                     )}
                     {parseFloat(paymentAmount) > paymentModal.owedAmount + 0.01 && (
                       <p className="text-xs text-blue-600 mt-2 font-medium">
-                        💰 Pagamento com adiantamento — o excedente de {(parseFloat(paymentAmount) - paymentModal.owedAmount).toFixed(2)}€ será aplicado como crédito no(s) mês(es) seguinte(s).
+                        💰 Pagamento com adiantamento — o excedente de {formatCurrency(parseFloat(paymentAmount) - paymentModal.owedAmount, i18n.language)} será aplicado como crédito no(s) mês(es) seguinte(s).
                       </p>
                     )}
                   </div>
@@ -612,7 +646,7 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
                     disabled={paymentLoading || !paymentAmount || parseFloat(paymentAmount) <= 0}
                     className="w-full py-3 bg-green-600 text-white rounded-2xl font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors"
                   >
-                    {paymentLoading ? 'A processar...' : `Emitir Recibo de ${parseFloat(paymentAmount || 0).toFixed(2)}€`}
+                    {paymentLoading ? 'A processar...' : `Emitir Recibo de ${formatCurrency(parseFloat(paymentAmount || 0), i18n.language)}`}
                   </button>
                 </div>
               );
@@ -623,11 +657,11 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
 
       {/* Modal para adicionar mês extra */}
       {showExtraForm && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setShowExtraForm(false)}>
-          <div className="bg-white rounded-3xl p-6 w-full max-w-lg max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={closeExtraForm}>
+          <div ref={extraFormModalRef} role="dialog" aria-modal="true" className="bg-white rounded-3xl p-6 w-full max-w-lg max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-bold text-slate-800">Adicionar Mês Extra</h3>
-              <button onClick={() => setShowExtraForm(false)} className="p-2 hover:bg-slate-100 rounded-xl">
+              <button onClick={closeExtraForm} className="p-2 hover:bg-slate-100 rounded-xl">
                 <X className="w-5 h-5 text-slate-400" />
               </button>
             </div>
@@ -746,12 +780,12 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
                           {isPaid ? (
                             <div className="flex flex-col items-center">
                               <CheckCircle className="w-4 h-4 mb-0.5" />
-                              <span className="text-[10px] font-bold uppercase tracking-tight">Pago</span>
+                              <span className="text-[10px] font-bold tracking-tight">Pago</span>
                             </div>
                           ) : (
                             <div className="flex flex-col items-center">
                               <div className="text-[10px] font-medium leading-tight">
-                                <div className="font-bold text-amber-700">Σ {amount.toFixed(2)}€</div>
+                                <div className="font-bold text-amber-700">Σ {formatCurrency(amount, i18n.language)}</div>
                               </div>
                             </div>
                           )}
@@ -777,32 +811,32 @@ function CurrentAccountPage({ budgets, users, quotas, isAdmin, db, appId, condo,
                           {isPaid ? (
                             <div className="flex flex-col items-center">
                               <CheckCircle className="w-4 h-4 mb-0.5" />
-                              <span className="text-[10px] font-bold uppercase tracking-tight">Pago</span>
+                              <span className="text-[10px] font-bold tracking-tight">Pago</span>
                               {quota.paidAmount !== undefined && quota.paidAmount < baseTotal + (quota.carryoverAmount || 0) - 0.01 && (
-                                <span className="text-[9px] text-amber-600 font-medium">{quota.paidAmount.toFixed(2)}€</span>
+                                <span className="text-[9px] text-amber-600 font-medium">{formatCurrency(quota.paidAmount, i18n.language)}</span>
                               )}
                               {quota.paidAmount !== undefined && quota.paidAmount > baseTotal + (quota.carryoverAmount || 0) + 0.01 && (
-                                <span className="text-[9px] text-blue-600 font-medium">{quota.paidAmount.toFixed(2)}€</span>
+                                <span className="text-[9px] text-blue-600 font-medium">{formatCurrency(quota.paidAmount, i18n.language)}</span>
                               )}
                             </div>
                           ) : totalWithCarry <= 0 ? (
                             <div className="flex flex-col items-center">
                               <CheckCircle className="w-4 h-4 mb-0.5 text-blue-500" />
-                              <span className="text-[10px] font-bold uppercase tracking-tight text-blue-600">Crédito</span>
+                              <span className="text-[10px] font-bold tracking-tight text-blue-600">Crédito</span>
                               <span className="text-[9px] text-blue-500 font-medium">coberto</span>
                             </div>
                           ) : (
                             <div className="flex flex-col items-center opacity-60 group-hover:opacity-100">
                               <div className="text-[10px] font-medium leading-tight">
-                                <div>Q: {quotaBase.toFixed(2)}€</div>
-                                <div>FR: {reserveFund.toFixed(2)}€</div>
+                                <div>Q: {formatCurrency(quotaBase, i18n.language)}</div>
+                                <div>FR: {formatCurrency(reserveFund, i18n.language)}</div>
                                 {carryover > 0.01 && (
-                                  <div className="text-amber-600">+{carryover.toFixed(2)}€</div>
+                                  <div className="text-amber-600">+{formatCurrency(carryover, i18n.language)}</div>
                                 )}
                                 {carryover < -0.01 && (
-                                  <div className="text-blue-600">{carryover.toFixed(2)}€</div>
+                                  <div className="text-blue-600">{formatCurrency(carryover, i18n.language)}</div>
                                 )}
-                                <div className="border-t border-slate-200 mt-1 pt-0.5 font-bold text-slate-600">Σ {totalWithCarry.toFixed(2)}€</div>
+                                <div className="border-t border-slate-200 mt-1 pt-0.5 font-bold text-slate-600">Σ {formatCurrency(totalWithCarry, i18n.language)}</div>
                               </div>
                             </div>
                           )}

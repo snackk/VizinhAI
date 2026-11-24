@@ -4,8 +4,14 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage
 import { Plus, X, Receipt, Edit2, Trash2, Calendar, ChevronDown, ChevronUp, FileSpreadsheet, Settings, Paperclip, Download } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 import * as XLSX from 'xlsx';
+import Toast from '../components/Toast';
+import ConfirmDialog from '../components/ConfirmDialog';
+import i18n from '../i18n';
+import { formatCurrency } from '../utils/formatCurrency';
 
-function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, db, appId, storage, selectedCondoId }) {
+function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, db, appId, storage, selectedCondoId, t }) {
+  const [toast, setToast] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [showTypeForm, setShowTypeForm] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
@@ -83,14 +89,13 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
       setEditingExpense(null);
       setFile(null);
     } catch (err) {
-      alert('Erro ao guardar despesa: ' + err.message);
+      setToast({ message: 'Erro ao guardar despesa: ' + err.message, type: 'error' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('Tem a certeza que deseja eliminar esta despesa?')) return;
+  const performDeleteExpense = async (id) => {
     try {
       const expense = expenses.find(e => e.firestoreId === id);
       if (expense?.invoiceFileName) {
@@ -105,8 +110,15 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
         });
       }
     } catch (err) {
-      alert('Erro ao eliminar: ' + err.message);
+      setToast({ message: 'Erro ao eliminar: ' + err.message, type: 'error' });
     }
+  };
+
+  const handleDelete = (id) => {
+    setConfirmDialog({
+      message: 'Tem a certeza que deseja eliminar esta despesa?',
+      onConfirm: () => { setConfirmDialog(null); performDeleteExpense(id); }
+    });
   };
 
   const handleAddType = async (e) => {
@@ -121,21 +133,30 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
       setNewTypeName('');
       setShowTypeForm(false);
     } catch (err) {
-      alert('Erro ao adicionar tipo: ' + err.message);
+      setToast({ message: 'Erro ao adicionar tipo: ' + err.message, type: 'error' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteType = async (typeId, typeName) => {
-    const hasExpenses = expenses.some(e => e.expenseType === typeName);
-    if (hasExpenses) return alert('Não é possível eliminar este tipo pois existem despesas associadas.');
-    if (!confirm('Tem a certeza que deseja eliminar este tipo de despesa?')) return;
+  const performDeleteType = async (typeId) => {
     try {
       await deleteDoc(doc(db, 'condos', selectedCondoId, 'expenseTypes', typeId));
     } catch (err) {
-      alert('Erro ao eliminar tipo: ' + err.message);
+      setToast({ message: 'Erro ao eliminar tipo: ' + err.message, type: 'error' });
     }
+  };
+
+  const handleDeleteType = (typeId, typeName) => {
+    const hasExpenses = expenses.some(e => e.expenseType === typeName);
+    if (hasExpenses) {
+      setToast({ message: 'Não é possível eliminar este tipo pois existem despesas associadas.', type: 'error' });
+      return;
+    }
+    setConfirmDialog({
+      message: 'Tem a certeza que deseja eliminar este tipo de despesa?',
+      onConfirm: () => { setConfirmDialog(null); performDeleteType(typeId); }
+    });
   };
 
   const groupedExpenses = expenses.reduce((acc, expense) => {
@@ -261,7 +282,7 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
     // Get the latest budget (sorted by startDate descending)
     const sortedBudgets = [...(budgets || [])].sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
     const latestBudget = sortedBudgets[0];
-    if (!latestBudget) return alert('Não existe nenhum orçamento configurado.');
+    if (!latestBudget) { setToast({ message: 'Não existe nenhum orçamento configurado.', type: 'error' }); return; }
 
     // Get budget period boundaries
     const start = new Date(latestBudget.startDate);
@@ -286,7 +307,7 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
     // Sort type names alphabetically
     const sortedTypeNames = Object.keys(typeGroups).sort((a, b) => a.localeCompare(b, 'pt'));
 
-    if (sortedTypeNames.length === 0) return alert('Não existem despesas no período do último orçamento.');
+    if (sortedTypeNames.length === 0) { setToast({ message: 'Não existem despesas no período do último orçamento.', type: 'error' }); return; }
 
     const wb = XLSX.utils.book_new();
 
@@ -321,6 +342,13 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
 
   return (
     <div className="space-y-6">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      <ConfirmDialog
+        open={!!confirmDialog}
+        message={confirmDialog?.message}
+        onConfirm={() => confirmDialog?.onConfirm()}
+        onCancel={() => setConfirmDialog(null)}
+      />
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-2">
         <div>
           <h2 className="text-[26px] font-bold text-slate-800 tracking-tight">Despesas</h2>
@@ -356,7 +384,7 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
             {(expenseTypes || []).map(type => (
               <div key={type.firestoreId} className="flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-lg group">
                 <span className="text-sm font-medium text-slate-700">{type.name}</span>
-                <button onClick={() => handleDeleteType(type.firestoreId, type.name)} className="text-slate-400 hover:text-red-500 transition-colors">
+                <button onClick={() => handleDeleteType(type.firestoreId, type.name)} aria-label={t('delete')} className="text-slate-400 hover:text-red-500 transition-colors">
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -373,11 +401,11 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
           <h3 className="font-bold text-lg text-slate-800">{editingExpense ? 'Editar Despesa' : 'Nova Despesa'}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-500 ml-1 uppercase tracking-wider">Data</label>
+              <label className="text-xs font-medium text-slate-500 ml-1">Data</label>
               <input required type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-500 ml-1 uppercase tracking-wider">Tipo de Despesa</label>
+              <label className="text-xs font-medium text-slate-500 ml-1">Tipo de Despesa</label>
               <select required value={expenseType} onChange={e => setExpenseType(e.target.value)} className="w-full px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all">
                 <option value="">Selecionar tipo...</option>
                 {[...(expenseTypes || [])].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt')).map(type => (
@@ -386,11 +414,11 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-500 ml-1 uppercase tracking-wider">Rubrica / Descrição</label>
+              <label className="text-xs font-medium text-slate-500 ml-1">Rubrica / Descrição</label>
               <input required placeholder="Ex: Limpeza, Elevador..." value={rubric} onChange={e => setRubric(e.target.value)} className="w-full px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-500 ml-1 uppercase tracking-wider">Valor (€)</label>
+              <label className="text-xs font-medium text-slate-500 ml-1">Valor (€)</label>
               <div className="relative">
                 <input required type="number" step="0.01" placeholder="0.00" value={value} onChange={e => setValue(e.target.value)} className="w-full px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all pr-8" />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">€</span>
@@ -399,7 +427,7 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-500 ml-1 uppercase tracking-wider">
+            <label className="text-xs font-medium text-slate-500 ml-1">
               <Paperclip className="w-3.5 h-3.5 inline mr-1" />
               Fatura (PDF, Imagem) — Opcional
             </label>
@@ -426,14 +454,14 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
           <div className="mb-4">
             <h3 className="font-bold text-lg text-slate-800">Despesas vs Orçamento</h3>
-            <p className="text-xs text-slate-500 mt-1">Evolução cumulativa dos gastos reais face ao orçamentado ({chartData.totalBudget.toFixed(2)} €)</p>
+            <p className="text-xs text-slate-500 mt-1">Evolução cumulativa dos gastos reais face ao orçamentado ({formatCurrency(chartData.totalBudget, i18n.language)})</p>
           </div>
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={chartData.data} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
               <YAxis tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} tickFormatter={(v) => `${v}€`} />
-              <Tooltip formatter={(value) => [`${Number(value).toFixed(2)} €`]} contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }} />
+              <Tooltip formatter={(value) => [formatCurrency(Number(value), i18n.language)]} contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }} />
               <Legend wrapperStyle={{ paddingTop: '12px' }} />
               <Line type="monotone" dataKey="Orçamentado" stroke="#94a3b8" strokeWidth={2} strokeDasharray="6 4" dot={false} />
               <Line type="monotone" dataKey="Gasto Real" stroke="#2563eb" strokeWidth={3} dot={{ fill: '#2563eb', r: 4 }} activeDot={{ r: 6 }} />
@@ -447,7 +475,7 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
           const isPeriodExpanded = expandedPeriods[period.id] || false;
 
           return (
-            <div key={period.id} className={`bg-white rounded-3xl border ${period.isCurrent ? 'border-blue-100 ring-1 ring-blue-50' : 'border-slate-100'} shadow-sm overflow-hidden`}>
+            <div key={period.id} className={`bg-white rounded-3xl border overflow-hidden ${period.isCurrent ? 'border-slate-300 border-l-4 border-l-blue-500 shadow-sm' : 'border-slate-100'}`}>
               <div className={`p-5 flex justify-between items-center cursor-pointer transition-colors ${!isPeriodExpanded ? 'hover:bg-slate-50' : ''}`} onClick={() => setExpandedPeriods({...expandedPeriods, [period.id]: !isPeriodExpanded})}>
                 <div className="flex items-center gap-4">
                   <div className={`p-3 rounded-2xl ${period.isCurrent ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-100 text-slate-500'}`}>
@@ -455,13 +483,13 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
                   </div>
                   <div>
                     <h3 className="font-bold text-slate-800 text-lg capitalize">{period.label}</h3>
-                    <p className="text-xs text-slate-500">{period.months.length} {period.months.length === 1 ? 'mês' : 'meses'} com despesas{period.totalBudget ? ` · Orçamento: ${period.totalBudget.toFixed(2)} €` : ''}</p>
+                    <p className="text-xs text-slate-500">{period.months.length} {period.months.length === 1 ? 'mês' : 'meses'} com despesas{period.totalBudget ? ` · Orçamento: ${formatCurrency(period.totalBudget, i18n.language)}` : ''}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-6">
                   <div className="text-right hidden sm:block">
-                    <p className="text-xs font-semibold uppercase text-slate-400 tracking-wider">Total Período</p>
-                    <p className={`font-bold text-lg ${period.isCurrent ? 'text-blue-600' : 'text-slate-900'}`}>{period.total.toFixed(2)} €</p>
+                    <p className="text-xs font-medium text-slate-500">Total Período</p>
+                    <p className={`font-bold text-lg ${period.isCurrent ? 'text-blue-600' : 'text-slate-900'}`}>{formatCurrency(period.total, i18n.language)}</p>
                   </div>
                   {isPeriodExpanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
                 </div>
@@ -487,7 +515,7 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
                             </div>
                           </div>
                           <div className="flex items-center gap-4">
-                            <p className={`font-bold text-sm ${isCurrent ? 'text-blue-600' : 'text-slate-700'}`}>{group.total.toFixed(2)} €</p>
+                            <p className={`font-bold text-sm ${isCurrent ? 'text-blue-600' : 'text-slate-700'}`}>{formatCurrency(group.total, i18n.language)}</p>
                             {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
                           </div>
                         </div>
@@ -512,7 +540,7 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
                                       <td className="px-4 py-3 text-slate-500 font-medium">{new Date(item.date).toLocaleDateString('pt')}</td>
                                       <td className="px-4 py-3 text-slate-500 text-xs">{item.expenseType ? <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-lg font-semibold">{item.expenseType}</span> : <span className="text-slate-300">—</span>}</td>
                                       <td className="px-4 py-3 text-slate-700 font-bold">{item.rubric}</td>
-                                      <td className="px-4 py-3 text-slate-900 font-black text-right">{item.amount.toFixed(2)} €</td>
+                                      <td className="px-4 py-3 text-slate-900 font-black text-right">{formatCurrency(item.amount, i18n.language)}</td>
                                       <td className="px-4 py-3 text-center">
                                         {item.invoiceUrl ? (
                                           <a href={item.invoiceUrl} target="_blank" rel="noopener noreferrer" title={item.invoiceFileName?.replace(/^\d+_/, '') || 'Fatura'} className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 transition-colors">
@@ -525,8 +553,8 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
                                       {isAdmin && (
                                         <td className="px-4 py-3">
                                           <div className="flex items-center justify-center gap-1">
-                                            <button onClick={() => setEditingExpense(item)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
-                                            <button onClick={() => handleDelete(item.firestoreId)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                            <button onClick={() => setEditingExpense(item)} aria-label={t('edit')} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
+                                            <button onClick={() => handleDelete(item.firestoreId)} aria-label={t('delete')} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
                                           </div>
                                         </td>
                                       )}
@@ -534,7 +562,7 @@ function ExpensesPage({ expenses, budgets, expenseTypes, isAdmin, currentUser, d
                                   ))}
                                   <tr className="bg-blue-50/30">
                                     <td colSpan="3" className="px-4 py-3 text-blue-900 font-bold text-right">Total do Mês</td>
-                                    <td className="px-4 py-3 text-blue-700 font-black text-right">{group.total.toFixed(2)} €</td>
+                                    <td className="px-4 py-3 text-blue-700 font-black text-right">{formatCurrency(group.total, i18n.language)}</td>
                                     <td></td>
                                     {isAdmin && <td></td>}
                                   </tr>

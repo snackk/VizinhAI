@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { collection, addDoc, deleteDoc, updateDoc, doc, onSnapshot, Timestamp } from 'firebase/firestore';
 import { CalendarDays, Plus, Trash2, X, ChevronDown, ChevronUp, Save } from 'lucide-react';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 export default function CalendarPage({ db, selectedCondoId, t }) {
   const [events, setEvents] = useState([]);
@@ -13,7 +15,10 @@ export default function CalendarPage({ db, selectedCondoId, t }) {
   const [hour, setHour] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const expandedRef = useRef(null);
+  const closeForm = useCallback(() => setShowForm(false), []);
+  const formModalRef = useModalA11y(showForm, closeForm);
 
   useEffect(() => {
     if (!selectedCondoId) return;
@@ -65,9 +70,15 @@ export default function CalendarPage({ db, selectedCondoId, t }) {
     setLoading(false);
   };
 
-  const handleDelete = async (eventId) => {
-    if (!confirm(t('calendarDeleteConfirm'))) return;
+  const performDelete = async (eventId) => {
     await deleteDoc(doc(db, `condos/${selectedCondoId}/events`, eventId));
+  };
+
+  const handleDelete = (eventId) => {
+    setConfirmDialog({
+      message: t('calendarDeleteConfirm'),
+      onConfirm: () => { setConfirmDialog(null); performDelete(eventId); }
+    });
   };
 
   const handleUpdate = async (eventId) => {
@@ -94,6 +105,12 @@ export default function CalendarPage({ db, selectedCondoId, t }) {
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog
+        open={!!confirmDialog}
+        message={confirmDialog?.message}
+        onConfirm={() => confirmDialog?.onConfirm()}
+        onCancel={() => setConfirmDialog(null)}
+      />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">{t('calendar')}</h1>
@@ -108,11 +125,11 @@ export default function CalendarPage({ db, selectedCondoId, t }) {
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 bg-slate-800/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowForm(false)}>
-          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-800/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={closeForm}>
+          <div ref={formModalRef} role="dialog" aria-modal="true" className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-slate-800">{t('calendarNewEvent')}</h2>
-              <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+              <button onClick={closeForm} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
             </div>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
@@ -164,7 +181,7 @@ export default function CalendarPage({ db, selectedCondoId, t }) {
                   </div>
                   <div className="flex items-center gap-1">
                     {isExpanded && (
-                      <button onClick={(e) => { e.stopPropagation(); handleDelete(event.id); }} className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-xl transition-colors">
+                      <button onClick={(e) => { e.stopPropagation(); handleDelete(event.id); }} aria-label={t('delete')} className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-xl transition-colors">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     )}

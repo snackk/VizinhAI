@@ -57,7 +57,7 @@ function LoginScreen({ t }) {
             <form onSubmit={handleResetPassword} className="space-y-5">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2 ml-1">E-mail</label>
-                <input type="email" required className="w-full px-5 py-3.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="O seu e-mail" />
+                <input type="email" required autoComplete="email" className="w-full px-5 py-3.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="O seu e-mail" />
               </div>
               <div className="pt-2">
                 <button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-xl transition-colors shadow-lg shadow-blue-600/20 disabled:opacity-70 flex justify-center items-center gap-2">
@@ -94,14 +94,14 @@ function LoginScreen({ t }) {
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2 ml-1">E-mail</label>
-              <input type="email" required className="w-full px-5 py-3.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="O seu e-mail" />
+              <input type="email" required autoComplete="email" className="w-full px-5 py-3.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="O seu e-mail" />
             </div>
             <div>
               <div className="flex justify-between items-center mb-2 ml-1">
                 <label className="block text-sm font-medium text-slate-700">Palavra-passe</label>
                 <button type="button" onClick={() => { setShowReset(true); setError(''); setResetSuccess(false); }} className="text-xs font-semibold text-blue-600 hover:text-blue-700">{t('forgotPassword')}</button>
               </div>
-              <input type="password" required className="w-full px-5 py-3.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
+              <input type="password" required autoComplete="current-password" className="w-full px-5 py-3.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
             </div>
             <div className="pt-2">
               <button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-xl transition-colors shadow-lg shadow-blue-600/20 disabled:opacity-70 flex justify-center items-center gap-2">

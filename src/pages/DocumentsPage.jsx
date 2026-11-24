@@ -2,8 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { FolderOpen, UploadCloud, X, Settings, FileText, Download, Edit2, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import Toast from '../components/Toast';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 function DocumentsPage({ documents, docTypes, isAdmin, currentUser, db, appId, storage, selectedCondoId }) {
+  const [toast, setToast] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [showTypeForm, setShowTypeForm] = useState(false);
   const [newTypeName, setNewTypeName] = useState('');
@@ -20,9 +24,9 @@ function DocumentsPage({ documents, docTypes, isAdmin, currentUser, db, appId, s
 
   const handleFileUpload = async (e) => {
     e.preventDefault();
-    if (!editingDoc && !file) return alert('Por favor selecione um ficheiro');
-    if (!selectedType) return alert('Por favor selecione um tipo de documento');
-    if (!docTitle) return alert('Por favor introduza um título');
+    if (!editingDoc && !file) { setToast({ message: 'Por favor selecione um ficheiro', type: 'error' }); return; }
+    if (!selectedType) { setToast({ message: 'Por favor selecione um tipo de documento', type: 'error' }); return; }
+    if (!docTitle) { setToast({ message: 'Por favor introduza um título', type: 'error' }); return; }
 
     setLoading(true);
     try {
@@ -58,7 +62,7 @@ function DocumentsPage({ documents, docTypes, isAdmin, currentUser, db, appId, s
       setDocTitle('');
       setSelectedType('');
     } catch (err) {
-      alert('Erro ao processar documento: ' + err.message);
+      setToast({ message: 'Erro ao processar documento: ' + err.message, type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -76,26 +80,33 @@ function DocumentsPage({ documents, docTypes, isAdmin, currentUser, db, appId, s
       setNewTypeName('');
       setShowTypeForm(false);
     } catch (err) {
-      alert('Erro ao adicionar tipo: ' + err.message);
+      setToast({ message: 'Erro ao adicionar tipo: ' + err.message, type: 'error' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteType = async (typeId, typeName) => {
-    const hasDocs = documents.some(d => d.type === typeName);
-    if (hasDocs) return alert('Não é possível eliminar este tipo pois existem documentos associados.');
-    if (!confirm('Tem a certeza que deseja eliminar este tipo de documento?')) return;
-    
+  const performDeleteType = async (typeId) => {
     try {
       await deleteDoc(doc(db, 'condos', selectedCondoId, 'docTypes', typeId));
     } catch (err) {
-      alert('Erro ao eliminar tipo: ' + err.message);
+      setToast({ message: 'Erro ao eliminar tipo: ' + err.message, type: 'error' });
     }
   };
 
-  const handleDeleteDoc = async (docItem) => {
-    if (!confirm('Tem a certeza que deseja eliminar este documento?')) return;
+  const handleDeleteType = (typeId, typeName) => {
+    const hasDocs = documents.some(d => d.type === typeName);
+    if (hasDocs) {
+      setToast({ message: 'Não é possível eliminar este tipo pois existem documentos associados.', type: 'error' });
+      return;
+    }
+    setConfirmDialog({
+      message: 'Tem a certeza que deseja eliminar este tipo de documento?',
+      onConfirm: () => { setConfirmDialog(null); performDeleteType(typeId); }
+    });
+  };
+
+  const performDeleteDoc = async (docItem) => {
     try {
       if (docItem.fileName) {
         const fileRef = ref(storage, `condos/${selectedCondoId}/documents/${docItem.fileName}`);
@@ -103,8 +114,15 @@ function DocumentsPage({ documents, docTypes, isAdmin, currentUser, db, appId, s
       }
       await deleteDoc(doc(db, 'condos', selectedCondoId, 'documents', docItem.firestoreId));
     } catch (err) {
-      alert('Erro ao eliminar documento: ' + err.message);
+      setToast({ message: 'Erro ao eliminar documento: ' + err.message, type: 'error' });
     }
+  };
+
+  const handleDeleteDoc = (docItem) => {
+    setConfirmDialog({
+      message: 'Tem a certeza que deseja eliminar este documento?',
+      onConfirm: () => { setConfirmDialog(null); performDeleteDoc(docItem); }
+    });
   };
 
   const handleEditDoc = (d) => {
@@ -123,6 +141,13 @@ function DocumentsPage({ documents, docTypes, isAdmin, currentUser, db, appId, s
 
   return (
     <div className="space-y-6">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      <ConfirmDialog
+        open={!!confirmDialog}
+        message={confirmDialog?.message}
+        onConfirm={() => confirmDialog?.onConfirm()}
+        onCancel={() => setConfirmDialog(null)}
+      />
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-2">
         <div>
           <h2 className="text-[26px] font-bold text-slate-800 tracking-tight">Documentos</h2>

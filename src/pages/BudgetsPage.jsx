@@ -2,8 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { Plus, X, Wallet, Edit2, Trash2, Calendar, ChevronDown, ChevronUp, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import Toast from '../components/Toast';
+import ConfirmDialog from '../components/ConfirmDialog';
+import i18n from '../i18n';
+import { formatCurrency } from '../utils/formatCurrency';
 
 function BudgetsPage({ budgets, users, isAdmin, db, appId, selectedCondoId }) {
+  const [toast, setToast] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editingBudget, setEditingBudget] = useState(null);
   const [startDate, setStartDate] = useState('');
@@ -59,19 +65,25 @@ function BudgetsPage({ budgets, users, isAdmin, db, appId, selectedCondoId }) {
       setShowForm(false);
       setEditingBudget(null);
     } catch (err) {
-      alert('Erro ao guardar orçamento: ' + err.message);
+      setToast({ message: 'Erro ao guardar orçamento: ' + err.message, type: 'error' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('Tem a certeza que deseja eliminar este orçamento?')) return;
+  const performDelete = async (id) => {
     try {
       await deleteDoc(doc(db, 'condos', selectedCondoId, 'budgets', id));
     } catch (err) {
-      alert('Erro ao eliminar: ' + err.message);
+      setToast({ message: 'Erro ao eliminar: ' + err.message, type: 'error' });
     }
+  };
+
+  const handleDelete = (id) => {
+    setConfirmDialog({
+      message: 'Tem a certeza que deseja eliminar este orçamento?',
+      onConfirm: () => { setConfirmDialog(null); performDelete(id); }
+    });
   };
 
   const getMonths = (start, end) => {
@@ -162,6 +174,13 @@ function BudgetsPage({ budgets, users, isAdmin, db, appId, selectedCondoId }) {
 
   return (
     <div className="space-y-6">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      <ConfirmDialog
+        open={!!confirmDialog}
+        message={confirmDialog?.message}
+        onConfirm={() => confirmDialog?.onConfirm()}
+        onCancel={() => setConfirmDialog(null)}
+      />
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-2">
         <div>
           <h2 className="text-[26px] font-bold text-slate-800">Orçamentos</h2>
@@ -220,7 +239,7 @@ function BudgetsPage({ budgets, users, isAdmin, db, appId, selectedCondoId }) {
             ))}
           </div>
           <div className="pt-4 border-t border-slate-100 flex justify-between items-center">
-            <span className="font-bold text-slate-700">Total: {calculateTotal(rubrics).toFixed(2)} €</span>
+            <span className="font-bold text-slate-700">Total: {formatCurrency(calculateTotal(rubrics), i18n.language)}</span>
             <button type="submit" disabled={loading} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-semibold disabled:opacity-50">
               {loading ? 'A processar...' : 'Submeter Orçamento'}
             </button>
@@ -251,7 +270,7 @@ function BudgetsPage({ budgets, users, isAdmin, db, appId, selectedCondoId }) {
                 <div className="flex items-center gap-4">
                   <div className="text-right hidden sm:block">
                     <p className="text-xs font-semibold uppercase text-slate-400 tracking-wider">Total</p>
-                    <p className="font-bold text-slate-900">{budget.totalAmount.toFixed(2)} €</p>
+                    <p className="font-bold text-slate-900">{formatCurrency(budget.totalAmount, i18n.language)}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     {isAdmin && (
@@ -279,16 +298,16 @@ function BudgetsPage({ budgets, users, isAdmin, db, appId, selectedCondoId }) {
                         {[...budget.rubrics].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt')).map((rubric, ridx) => (
                           <tr key={ridx}>
                             <td className="px-4 py-3 text-slate-700 font-medium">{rubric.name}</td>
-                            <td className="px-4 py-3 text-slate-900 font-bold text-right">{Number(rubric.value).toFixed(2)} €</td>
+                            <td className="px-4 py-3 text-slate-900 font-bold text-right">{formatCurrency(Number(rubric.value), i18n.language)}</td>
                           </tr>
                         ))}
                         <tr>
                           <td className="px-4 py-3 text-slate-700 font-medium">Fundo de Reserva ({budget.reserveFundPercentage ?? 10}%)</td>
-                          <td className="px-4 py-3 text-slate-900 font-bold text-right">{(budget.totalAmount * ((budget.reserveFundPercentage ?? 10) / 100)).toFixed(2)} €</td>
+                          <td className="px-4 py-3 text-slate-900 font-bold text-right">{formatCurrency(budget.totalAmount * ((budget.reserveFundPercentage ?? 10) / 100), i18n.language)}</td>
                         </tr>
                         <tr className="bg-blue-50/30">
                           <td className="px-4 py-4 text-blue-900 font-bold">Total do Exercício (+ FR)</td>
-                          <td className="px-4 py-4 text-blue-700 font-black text-right text-lg">{(budget.totalAmount * (1 + (budget.reserveFundPercentage ?? 10) / 100)).toFixed(2)} €</td>
+                          <td className="px-4 py-4 text-blue-700 font-black text-right text-lg">{formatCurrency(budget.totalAmount * (1 + (budget.reserveFundPercentage ?? 10) / 100), i18n.language)}</td>
                         </tr>
                       </tbody>
                     </table>

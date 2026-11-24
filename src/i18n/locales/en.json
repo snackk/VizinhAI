@@ -23,7 +23,7 @@
   "collectedFund": "Collected Fund",
   "overdueQuotas": "Overdue Quotas",
   "pendingExpenses": "Pending Expenses",
-  "budgetedOf": "From {{amount}} € budgeted",
+  "budgetedOf": "From {{amount}} budgeted",
   "toReceive": "Amount to receive",
   "waitingApproval": "Waiting for approval",
   "hello": "Hello, {{name}}",
@@ -99,6 +99,8 @@
   "calendarDeleteConfirm": "Are you sure you want to delete this event?",
   "calendarNoEvents": "No events scheduled.",
   "accountBalance": "Account Balance",
-  "bankBalance": "Bank account balance"
+  "bankBalance": "Bank account balance",
+  "edit": "Edit",
+  "delete": "Delete"
 }
 

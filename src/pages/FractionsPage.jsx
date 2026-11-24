@@ -4,8 +4,12 @@ import { getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail, signOu
 import { setDoc, updateDoc, deleteDoc, doc, collection } from 'firebase/firestore';
 import { firebaseConfig, auth } from '../config/firebase.js';
 import { Plus, X, Edit2, Trash2, Eye } from 'lucide-react';
+import Toast from '../components/Toast';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 function FractionsPage({ users, quotas, isAdmin, db, appId, budgets, currentUser, t, selectedCondoId, onImpersonate }) {
+  const [toast, setToast] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [newName, setNewName] = useState('');
@@ -50,8 +54,7 @@ function FractionsPage({ users, quotas, isAdmin, db, appId, budgets, currentUser
     }
   }, [editingUser]);
 
-  const handlePromoteAdmin = async (user) => {
-    if (!confirm(t('promoteConfirm', { name: user.name }))) return;
+  const performPromoteAdmin = async (user) => {
     setLoading(true);
     try {
       const existingAdmin = users.find(u => u.role === 'admin' && u.firestoreId !== user.firestoreId);
@@ -61,12 +64,19 @@ function FractionsPage({ users, quotas, isAdmin, db, appId, budgets, currentUser
       }
       await updateDoc(doc(db, 'condos', selectedCondoId, 'users', user.firestoreId), { role: 'admin' });
       await updateDoc(doc(db, 'users', user.firestoreId), { role: 'admin' });
-      alert('Utilizador promovido a administrador.');
+      setToast({ message: 'Utilizador promovido a administrador.', type: 'success' });
     } catch (err) {
-      alert('Erro ao promover administrador: ' + err.message);
+      setToast({ message: 'Erro ao promover administrador: ' + err.message, type: 'error' });
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePromoteAdmin = (user) => {
+    setConfirmDialog({
+      message: t('promoteConfirm', { name: user.name }),
+      onConfirm: () => { setConfirmDialog(null); performPromoteAdmin(user); }
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -75,10 +85,10 @@ function FractionsPage({ users, quotas, isAdmin, db, appId, budgets, currentUser
     try {
       if (editingUser) {
         await updateDoc(doc(db, 'condos', selectedCondoId, 'users', editingUser.firestoreId), {
-          name: newName, fraction: newFraction, permilagem: parseFloat(newPermilagem) || 0, phone: newPhone, nif: parseInt(newNif) || null,
+          name: newName, fraction: newFraction, permilagem: parseFloat(newPermilagem) || 0, phone: newPhone, nif: newNif || null,
         });
         await updateDoc(doc(db, 'users', editingUser.firestoreId), {
-          name: newName, permilagem: parseFloat(newPermilagem) || 0, phone: newPhone, nif: parseInt(newNif) || null,
+          name: newName, permilagem: parseFloat(newPermilagem) || 0, phone: newPhone, nif: newNif || null,
         });
         setMsg({ type: 'success', text: 'Condómino atualizado!' });
         setTimeout(() => { setShowForm(false); setEditingUser(null); }, 2000);
@@ -90,14 +100,14 @@ function FractionsPage({ users, quotas, isAdmin, db, appId, budgets, currentUser
 
         const newUser = {
           id: userCred.user.uid, name: newName, email: newEmail, fraction: newFraction,
-          permilagem: parseFloat(newPermilagem) || 0, phone: newPhone, nif: parseInt(newNif) || null,
+          permilagem: parseFloat(newPermilagem) || 0, phone: newPhone, nif: newNif || null,
           role: 'user', condoId: selectedCondoId
         };
 
         await setDoc(doc(db, 'condos', selectedCondoId, 'users', userCred.user.uid), newUser);
         await setDoc(doc(db, 'users', userCred.user.uid), {
           name: newName, email: newEmail, role: 'user',
-          permilagem: parseFloat(newPermilagem) || 0, phone: newPhone, nif: parseInt(newNif) || null,
+          permilagem: parseFloat(newPermilagem) || 0, phone: newPhone, nif: newNif || null,
           condoIds: [selectedCondoId]
         }, { merge: true });
 
@@ -115,14 +125,20 @@ function FractionsPage({ users, quotas, isAdmin, db, appId, budgets, currentUser
     }
   };
 
-  const handleDeleteUser = async (user) => {
-    if (!confirm(`Tem a certeza que deseja eliminar o utilizador ${user.name} deste condomínio?`)) return;
+  const performDeleteUser = async (user) => {
     try {
       await deleteDoc(doc(db, 'condos', selectedCondoId, 'users', user.firestoreId));
-      alert('Utilizador eliminado do condomínio com sucesso.');
+      setToast({ message: 'Utilizador eliminado do condomínio com sucesso.', type: 'success' });
     } catch (err) {
-      alert('Erro ao eliminar: ' + err.message);
+      setToast({ message: 'Erro ao eliminar: ' + err.message, type: 'error' });
     }
+  };
+
+  const handleDeleteUser = (user) => {
+    setConfirmDialog({
+      message: `Tem a certeza que deseja eliminar o utilizador ${user.name} deste condomínio?`,
+      onConfirm: () => { setConfirmDialog(null); performDeleteUser(user); }
+    });
   };
 
   const fractionsList = [...users].sort((a, b) => (a.fraction || '').localeCompare(b.fraction || '', 'pt')).map(user => {
@@ -141,6 +157,13 @@ function FractionsPage({ users, quotas, isAdmin, db, appId, budgets, currentUser
 
   return (
     <div className="space-y-6">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      <ConfirmDialog
+        open={!!confirmDialog}
+        message={confirmDialog?.message}
+        onConfirm={() => confirmDialog?.onConfirm()}
+        onCancel={() => setConfirmDialog(null)}
+      />
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-2">
         <div><h2 className="text-[26px] font-bold text-slate-800">Frações</h2></div>
         {isAdmin && (
@@ -157,11 +180,11 @@ function FractionsPage({ users, quotas, isAdmin, db, appId, budgets, currentUser
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-500 ml-1">Nome</label>
-              <input required type="text" placeholder="Nome completo" value={newName} onChange={e => setNewName(e.target.value)} className="w-full px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
+              <input required type="text" autoComplete="name" placeholder="Nome completo" value={newName} onChange={e => setNewName(e.target.value)} className="w-full px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-500 ml-1">E-mail</label>
-              <input required type="email" placeholder="E-mail" value={newEmail} onChange={e => setNewEmail(e.target.value)} disabled={!!editingUser} className="w-full px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" />
+              <input required type="email" autoComplete="email" placeholder="E-mail" value={newEmail} onChange={e => setNewEmail(e.target.value)} disabled={!!editingUser} className="w-full px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-500 ml-1">Fração</label>
@@ -173,11 +196,11 @@ function FractionsPage({ users, quotas, isAdmin, db, appId, budgets, currentUser
             </div>
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-500 ml-1">{t('phoneLabel')}</label>
-              <input type="text" placeholder={t('phonePlaceholder')} value={newPhone} onChange={e => setNewPhone(e.target.value)} className="w-full px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
+              <input type="text" autoComplete="tel" placeholder={t('phonePlaceholder')} value={newPhone} onChange={e => setNewPhone(e.target.value)} className="w-full px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-500 ml-1">{t('nifLabel')}</label>
-              <input type="number" placeholder={t('nifPlaceholder')} value={newNif} onChange={e => setNewNif(e.target.value)} className="w-full px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
+              <input type="text" inputMode="numeric" pattern="[0-9]*" placeholder={t('nifPlaceholder')} value={newNif} onChange={e => setNewNif(e.target.value.replace(/\D/g, '').slice(0, 9))} className="w-full px-4 py-3.5 border border-slate-200 bg-slate-50 focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
           </div>
           <button type="submit" disabled={loading} className="mt-5 w-full bg-slate-900 text-white px-6 py-4 rounded-xl font-semibold disabled:opacity-50 transition-all active:scale-[0.98]">

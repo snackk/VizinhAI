@@ -23,7 +23,7 @@
   "collectedFund": "Fonds Collectés",
   "overdueQuotas": "Charges Impayées",
   "pendingExpenses": "Dépenses en Attente",
-  "budgetedOf": "Sur {{amount}} € budgétisés",
+  "budgetedOf": "Sur {{amount}} budgétisés",
   "toReceive": "Montant à recevoir",
   "waitingApproval": "En attente d'approbation",
   "hello": "Bonjour, {{name}}",
@@ -84,6 +84,8 @@
   "calendarDeleteConfirm": "Êtes-vous sûr de vouloir supprimer cet événement ?",
   "calendarNoEvents": "Aucun événement prévu.",
   "accountBalance": "Solde Comptable",
-  "bankBalance": "Solde du compte bancaire"
+  "bankBalance": "Solde du compte bancaire",
+  "edit": "Modifier",
+  "delete": "Supprimer"
 }
 

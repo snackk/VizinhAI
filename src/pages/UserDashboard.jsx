@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { AlertCircle, CheckCircle, ChevronUp, Calendar, Landmark } from 'lucide-react';
 import AnnualQuotasTable from '../components/AnnualQuotasTable.jsx';
+import i18n from '../i18n';
+import { formatCurrency } from '../utils/formatCurrency';
 
 function UserDashboard({ user, quotas, expenses, budgets, users, assembleias, condo, t }) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -94,8 +96,8 @@ function UserDashboard({ user, quotas, expenses, budgets, users, assembleias, co
         >
           <div className="flex items-start justify-between">
             <div>
-              <p className={`text-sm font-semibold uppercase tracking-wider ${hasDebt ? 'text-red-800/70' : 'text-green-800/70'}`}>{hasDebt ? t('amountToPay') : t('regularSituation')}</p>
-              <h3 className={`text-4xl font-bold mt-2 tracking-tight ${hasDebt ? 'text-red-600' : 'text-green-600'}`}>{pendingAmount.toFixed(2)} €</h3>
+              <p className={`text-sm font-medium ${hasDebt ? 'text-red-800/70' : 'text-green-800/70'}`}>{hasDebt ? t('amountToPay') : t('regularSituation')}</p>
+              <h3 className={`text-4xl font-bold mt-2 tracking-tight ${hasDebt ? 'text-red-600' : 'text-green-600'}`}>{formatCurrency(pendingAmount, i18n.language)}</h3>
             </div>
             <div className={`p-3.5 rounded-2xl ${hasDebt ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
               {hasDebt ? (isExpanded ? <ChevronUp className="w-6 h-6" /> : <AlertCircle className="w-6 h-6" />) : <CheckCircle className="w-6 h-6" />}
@@ -104,7 +106,7 @@ function UserDashboard({ user, quotas, expenses, budgets, users, assembleias, co
           
           {hasDebt && isExpanded && (
             <div className="mt-6 pt-6 border-t border-red-200/50 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-              <p className="text-xs font-bold text-red-800/60 uppercase tracking-widest mb-4">{t('overdueMonths')}</p>
+              <p className="text-xs font-medium text-red-800/60 mb-4">{t('overdueMonths')}</p>
               {extraPendingQuotas.map((q, idx) => {
                 const [y, m] = q.monthKey.split('-').map(Number);
                 return (
@@ -112,7 +114,7 @@ function UserDashboard({ user, quotas, expenses, budgets, users, assembleias, co
                     <span className="text-sm font-semibold text-amber-900 capitalize">
                       {t(`months.${m}`)} {y} <span className="text-[10px] text-amber-600 font-normal">(atraso)</span>
                     </span>
-                    <span className="text-sm font-bold text-amber-700">{(q.extraAmount || 0).toFixed(2)} €</span>
+                    <span className="text-sm font-bold text-amber-700">{formatCurrency(q.extraAmount || 0, i18n.language)}</span>
                   </div>
                 );
               })}
@@ -121,7 +123,7 @@ function UserDashboard({ user, quotas, expenses, budgets, users, assembleias, co
                   <span className="text-sm font-semibold text-red-900 capitalize">
                     {t(`months.${m.getMonth()}`)} {m.getFullYear()}
                   </span>
-                  <span className="text-sm font-bold text-red-600">{totalMonthly.toFixed(2)} €</span>
+                  <span className="text-sm font-bold text-red-600">{formatCurrency(totalMonthly, i18n.language)}</span>
                 </div>
               ))}
             </div>
@@ -131,8 +133,8 @@ function UserDashboard({ user, quotas, expenses, budgets, users, assembleias, co
         <div className="p-6 rounded-3xl border bg-blue-50 border-blue-100 shadow-sm">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-600/70 mb-1">{t('accountBalance')}</p>
-              <h3 className="text-3xl font-bold text-slate-900 tracking-tight">{(condo?.saldoContabilistico || 0).toFixed(2)} €</h3>
+              <p className="text-xs font-medium text-slate-500 mb-1">{t('accountBalance')}</p>
+              <h3 className="text-3xl font-bold text-slate-900 tracking-tight">{formatCurrency(condo?.saldoContabilistico || 0, i18n.language)}</h3>
               <p className="text-[13px] text-slate-500 mt-2 font-medium">{t('bankBalance')}</p>
             </div>
             <div className="p-3 bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-white">

@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { Home, Plus, X, Edit2, Trash2 } from 'lucide-react';
+import Toast from '../components/Toast';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 function CondosPage({ allCondos, db, t, onFirstCreate }) {
+  const [toast, setToast] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editingCondo, setEditingCondo] = useState(null);
   const [name, setName] = useState('');
@@ -45,23 +49,36 @@ function CondosPage({ allCondos, db, t, onFirstCreate }) {
       setShowForm(false);
       setEditingCondo(null);
     } catch (err) {
-      alert('Erro: ' + err.message);
+      setToast({ message: 'Erro: ' + err.message, type: 'error' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (condoId) => {
-    if (!confirm(t('confirmDeleteCondo'))) return;
+  const performDelete = async (condoId) => {
     try {
       await deleteDoc(doc(db, 'condos', condoId));
     } catch (err) {
-      alert('Erro ao eliminar: ' + err.message);
+      setToast({ message: 'Erro ao eliminar: ' + err.message, type: 'error' });
     }
+  };
+
+  const handleDelete = (condoId) => {
+    setConfirmDialog({
+      message: t('confirmDeleteCondo'),
+      onConfirm: () => { setConfirmDialog(null); performDelete(condoId); }
+    });
   };
 
   return (
     <div className="space-y-6">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      <ConfirmDialog
+        open={!!confirmDialog}
+        message={confirmDialog?.message}
+        onConfirm={() => confirmDialog?.onConfirm()}
+        onCancel={() => setConfirmDialog(null)}
+      />
       <div className="flex justify-between items-center pt-2">
         <div>
           <h2 className="text-[26px] font-bold text-slate-800 tracking-tight">{t('condos')}</h2>
@@ -77,11 +94,11 @@ function CondosPage({ allCondos, db, t, onFirstCreate }) {
           <h3 className="font-bold text-lg text-slate-800">{editingCondo ? t('editCondo') : t('createCondo')}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-500 ml-1 uppercase">{t('condoName')}</label>
+              <label className="text-xs font-medium text-slate-500 ml-1">{t('condoName')}</label>
               <input required value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3 border border-slate-200 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-500 ml-1 uppercase">{t('condoAddress')}</label>
+              <label className="text-xs font-medium text-slate-500 ml-1">{t('condoAddress')}</label>
               <input required value={address} onChange={e => setAddress(e.target.value)} className="w-full px-4 py-3 border border-slate-200 bg-slate-50 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <div className="space-y-1">
@@ -116,8 +133,8 @@ function CondosPage({ allCondos, db, t, onFirstCreate }) {
                 </div>
               </div>
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => setEditingCondo(c)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><Edit2 className="w-4 h-4" /></button>
-                <button onClick={() => handleDelete(c.firestoreId)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"><Trash2 className="w-4 h-4" /></button>
+                <button onClick={() => setEditingCondo(c)} aria-label={t('edit')} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><Edit2 className="w-4 h-4" /></button>
+                <button onClick={() => handleDelete(c.firestoreId)} aria-label={t('delete')} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
             <div className="pt-4 border-t border-slate-50 flex justify-between items-center text-xs text-slate-400 font-medium">
