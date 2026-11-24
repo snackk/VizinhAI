@@ -10,7 +10,7 @@
     "emulators": "firebase emulators:start"
   },
   "dependencies": {
-    "firebase": "^10.8.0",
+    "firebase": "^13.4.0",
     "i18next": "^23.10.0",
     "jspdf": "^2.5.1",
     "lucide-react": "^0.292.0",
